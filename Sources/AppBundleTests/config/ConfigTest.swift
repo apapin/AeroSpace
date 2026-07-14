@@ -633,18 +633,30 @@ final class ConfigTest: XCTestCase {
         )
     }
 
-    func testParseBspAndMouseDropAction() {
+    func testParseBspOptionsAndMouseDropAction() {
         let result = parseConfig(
             """
             enable-bsp-layout = true
+            bsp-auto-balance = 'workspace'
             mouse-drop-action = 'stack'
             """,
         )
         assertEquals(result.errors, [])
         assertTrue(result.config.enableBspLayout)
+        assertEquals(result.config.bspAutoBalance, .workspace)
         assertEquals(result.config.mouseDropAction, .stack)
         assertFalse(parseConfig("").config.enableBspLayout)
+        assertEquals(parseConfig("").config.bspAutoBalance, .off)
         assertEquals(parseConfig("").config.mouseDropAction, .swap)
+    }
+
+    func testRejectsUnknownBspAutoBalanceMode() {
+        let result = parseConfig("bsp-auto-balance = 'global'")
+
+        assertEquals(
+            result.strErrors,
+            ["[ERROR] bsp-auto-balance: Can't parse 'global'.\nPossible values: (off|ancestors|workspace)"],
+        )
     }
 
     func testDeprecatedBspAndMouseDropAliases() {

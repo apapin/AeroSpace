@@ -371,6 +371,9 @@ Configured by `enable-normalization-opposite-orientation-for-nested-containers`
 The split axis follows the leaf's longest side, and the two children initially receive equal space.
 Generic tree commands are still allowed; a repair pass only folds a temporary node with more than two children back to the binary invariant.
 Accordion subtrees remain "escape islands", and a stack is treated as one BSP leaf.
+`bsp-auto-balance = 'ancestors'` gives each affected subtree space proportional to its BSP-leaf count after an insertion, removal, stack, or directional mouse drop.
+For example, splitting one side of a two-window layout changes the outer ratio from `1:1` to `1:2`, so all three slots receive equal virtual area while ratios inside unrelated subtrees remain untouched.
+`bsp-auto-balance = 'workspace'` reapplies that rule recursively to every tiled subtree; `off` preserves split sizes exactly as before.
 If an application rejects a tile smaller than its native minimum size, AeroSpace remembers the rejected dimension, expands that leaf, and keeps it inside the workspace.
 At extreme depths, the expanded leaf can overlap a neighbor because the requested BSP geometry is physically too small for the application.
 The former `enable-normalization-bsp-shape` key remains accepted as a deprecated alias so existing fork configs continue to work.

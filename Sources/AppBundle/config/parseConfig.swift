@@ -122,6 +122,7 @@ private let configVersionConfigRootKey = "config-version"
 private let modeConfigRootKey = "mode"
 private let persistentWorkspacesKey = "persistent-workspaces"
 private let enableBspLayoutKey = "enable-bsp-layout"
+private let bspAutoBalanceKey = "bsp-auto-balance"
 private let mouseDropActionKey = "mouse-drop-action"
 private let deprecatedEnableNormalizationBspShapeKey = "enable-normalization-bsp-shape"
 private let deprecatedMouseDragDropActionKey = "mouse-drag-drop-action"
@@ -143,6 +144,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "enable-normalization-flatten-containers": Parser(\.enableNormalizationFlattenContainers, parseBool),
     "enable-normalization-opposite-orientation-for-nested-containers": Parser(\.enableNormalizationOppositeOrientationForNestedContainers, parseBool),
     enableBspLayoutKey: Parser(\.enableBspLayout, parseBool),
+    bspAutoBalanceKey: Parser(\.bspAutoBalance, parseBspAutoBalance),
 
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
     "default-root-container-orientation": Parser(\.defaultRootContainerOrientation, parseDefaultContainerOrientation),
@@ -473,6 +475,10 @@ private func parseDefaultContainerOrientation(_ raw: OrderedJson, _ backtrace: C
 
 private func parseMouseDropAction(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<MouseDropAction> {
     parseString(raw, backtrace).flatMap { parseEnum($0, MouseDropAction.self).toParsedConfig(backtrace) }
+}
+
+private func parseBspAutoBalance(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<BspAutoBalance> {
+    parseString(raw, backtrace).flatMap { parseEnum($0, BspAutoBalance.self).toParsedConfig(backtrace) }
 }
 
 extension ResOrStr where Failure == String {

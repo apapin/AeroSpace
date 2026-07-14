@@ -87,6 +87,11 @@ final class MacWindow: Window {
         if !skipClosedWindowsCache { cacheClosedWindowIfNeeded() }
         let parent = unbindFromParent().parent
         let deadWindowWorkspace = parent.nodeWorkspace
+        if let tilingParent = parent as? TilingContainer,
+           tilingParent.layout == .tiles || tilingParent.isEffectivelyEmpty
+        {
+            rebalanceBspAfterTopologyChange(around: [tilingParent])
+        }
         let focus = focus
         if let deadWindowWorkspace, deadWindowWorkspace == focus.workspace ||
             deadWindowWorkspace == prevFocusedWorkspace && prevFocusedWorkspaceDate.distance(to: .now) < 1

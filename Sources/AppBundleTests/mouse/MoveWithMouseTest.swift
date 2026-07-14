@@ -128,6 +128,21 @@ final class MoveWithMouseTest: XCTestCase {
         XCTAssertEqual(root.children[0].getWeight(.h), 3)
     }
 
+    func testStackDropRebalancesTheRemovedSlot() {
+        config.enableBspLayout = true
+        config.bspAutoBalance = .ancestors
+        let root = Workspace.get(byName: name).rootTilingContainer
+        let source = TestWindow.new(id: 1, parent: root)
+        let target = TestWindow.new(id: 2, parent: root)
+        TestWindow.new(id: 3, parent: root)
+
+        stackWindow(source, onto: target)
+
+        XCTAssertEqual(root.children.count, 2)
+        XCTAssertEqual(root.children[0].getWeight(.h), 960, accuracy: 0.001)
+        XCTAssertEqual(root.children[1].getWeight(.h), 960, accuracy: 0.001)
+    }
+
     func testCenterSwapExchangesSingletonWithEntireStack() {
         let workspace = Workspace.get(byName: name)
         let root = workspace.rootTilingContainer
@@ -323,6 +338,24 @@ final class MoveWithMouseTest: XCTestCase {
                 .v_tiles([.window(3), .window(2)]),
             ]),
         )
+    }
+
+    func testDirectionalDropRebalancesSourceAndDestinationAncestors() {
+        config.enableBspLayout = true
+        config.bspAutoBalance = .ancestors
+        let root = Workspace.get(byName: name).rootTilingContainer
+        let source = TilingContainer.newVTiles(parent: root, adaptiveWeight: 1280, index: INDEX_BIND_LAST)
+        TestWindow.new(id: 1, parent: source, adaptiveWeight: 540)
+        let dragged = TestWindow.new(id: 2, parent: source, adaptiveWeight: 540)
+        let target = TestWindow.new(id: 3, parent: root, adaptiveWeight: 640)
+
+        reparentWindowForMouseDrop(dragged, relativeTo: target, direction: .down)
+
+        XCTAssertEqual(root.children[0].getWeight(.h), 640, accuracy: 0.001)
+        XCTAssertEqual(root.children[1].getWeight(.h), 1280, accuracy: 0.001)
+        let wrapper = root.children[1] as! TilingContainer
+        XCTAssertEqual(wrapper.children[0].getWeight(.v), 540, accuracy: 0.001)
+        XCTAssertEqual(wrapper.children[1].getWeight(.v), 540, accuracy: 0.001)
     }
 
     func testRepeatedDropIsIdempotent() {

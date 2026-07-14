@@ -187,6 +187,7 @@ func commitMouseDropPlan(_ plan: MouseDropPlan) {
 @MainActor
 private func moveWindowForMouseDrop(_ window: Window, to workspace: Workspace) {
     guard workspace != window.nodeWorkspace else { return }
+    let sourceParent = window.parent as? TilingContainer
     let target = workspace.mostRecentWindowRecursive
     if let target,
        let targetParent = target.parent as? TilingContainer,
@@ -202,6 +203,7 @@ private func moveWindowForMouseDrop(_ window: Window, to workspace: Workspace) {
     } else {
         window.bind(to: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: 0)
     }
+    rebalanceBspAfterTopologyChange(around: [sourceParent, window].compactMap { $0 })
 }
 
 @MainActor
@@ -213,6 +215,7 @@ func reparentWindowForMouseDrop(
     let targetSlot = target.bspSlot
     if window === target || window.bspSlot === targetSlot { return }
     guard let targetParent = targetSlot.parent as? TilingContainer else { return }
+    let sourceParent = window.parent as? TilingContainer
 
     let placeAfterTarget = direction.isPositive
     if window.parent === targetParent,
@@ -254,6 +257,7 @@ func reparentWindowForMouseDrop(
         targetSlot.bind(to: wrapper, adaptiveWeight: 1, index: 1)
     }
     window.markAsMostRecentChild()
+    rebalanceBspAfterTopologyChange(around: [sourceParent, window].compactMap { $0 })
 }
 
 @MainActor

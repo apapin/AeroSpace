@@ -72,6 +72,103 @@ final class BspTest: XCTestCase {
         XCTAssertEqual(sibling.getWeight(.h), 1340)
     }
 
+    func testAncestorAutoBalanceGivesThreeSpiralSlotsEqualArea() {
+        config.bspAutoBalance = .ancestors
+        let root = focus.workspace.rootTilingContainer
+        let first = TestWindow.new(id: 1, parent: root)
+        let second = TestWindow.new(id: 2, parent: root)
+        insertWindowUsingBsp(second, splitting: first)
+        let third = TestWindow.new(id: 3, parent: root)
+
+        insertWindowUsingBsp(third, splitting: second)
+
+        XCTAssertEqual(root.children[0].getWeight(.h), 640, accuracy: 0.001)
+        XCTAssertEqual(root.children[1].getWeight(.h), 1280, accuracy: 0.001)
+        let rects = [first, second, third].map { $0.estimatedTilingRect().orDie() }
+        let areas = rects.map { $0.width * $0.height }
+        XCTAssertEqual(areas[0], areas[1], accuracy: 0.001)
+        XCTAssertEqual(areas[1], areas[2], accuracy: 0.001)
+    }
+
+    func testAncestorAutoBalancePreservesUnrelatedManualRatio() {
+        config.bspAutoBalance = .ancestors
+        let root = focus.workspace.rootTilingContainer
+        let unrelated = TilingContainer(parent: root, adaptiveWeight: 960, .v, .tiles, index: 0)
+        let top = TestWindow.new(id: 1, parent: unrelated)
+        let bottom = TestWindow.new(id: 2, parent: unrelated)
+        top.setWeight(.v, 200)
+        bottom.setWeight(.v, 880)
+        let target = TestWindow.new(id: 3, parent: root, adaptiveWeight: 960)
+        let inserted = TestWindow.new(id: 4, parent: root)
+
+        insertWindowUsingBsp(inserted, splitting: target)
+
+        XCTAssertEqual(top.getWeight(.v), 200)
+        XCTAssertEqual(bottom.getWeight(.v), 880)
+        XCTAssertEqual(root.children[0].getWeight(.h), 960, accuracy: 0.001)
+        XCTAssertEqual(root.children[1].getWeight(.h), 960, accuracy: 0.001)
+    }
+
+    func testWorkspaceAutoBalanceAlsoResetsUnrelatedManualRatio() {
+        config.bspAutoBalance = .workspace
+        let root = focus.workspace.rootTilingContainer
+        let unrelated = TilingContainer(parent: root, adaptiveWeight: 960, .v, .tiles, index: 0)
+        let top = TestWindow.new(id: 1, parent: unrelated)
+        let bottom = TestWindow.new(id: 2, parent: unrelated)
+        top.setWeight(.v, 200)
+        bottom.setWeight(.v, 880)
+        let target = TestWindow.new(id: 3, parent: root, adaptiveWeight: 960)
+        let inserted = TestWindow.new(id: 4, parent: root)
+
+        insertWindowUsingBsp(inserted, splitting: target)
+
+        XCTAssertEqual(top.getWeight(.v), 540, accuracy: 0.001)
+        XCTAssertEqual(bottom.getWeight(.v), 540, accuracy: 0.001)
+    }
+
+    func testStackCountsAsOneSlotDuringAutoBalance() {
+        config.bspAutoBalance = .ancestors
+        let root = focus.workspace.rootTilingContainer
+        let stack = TilingContainer(parent: root, adaptiveWeight: 960, .h, .stack, index: 0)
+        TestWindow.new(id: 1, parent: stack)
+        TestWindow.new(id: 2, parent: stack)
+        let target = TestWindow.new(id: 3, parent: root, adaptiveWeight: 960)
+        let inserted = TestWindow.new(id: 4, parent: root)
+
+        insertWindowUsingBsp(inserted, splitting: target)
+
+        XCTAssertEqual(root.children[0].getWeight(.h), 640, accuracy: 0.001)
+        XCTAssertEqual(root.children[1].getWeight(.h), 1280, accuracy: 0.001)
+        let stackRect = stack.estimatedTilingRect().orDie()
+        let targetRect = target.estimatedTilingRect().orDie()
+        XCTAssertEqual(
+            stackRect.width * stackRect.height,
+            targetRect.width * targetRect.height,
+            accuracy: 0.001,
+        )
+    }
+
+    func testRemovalRebalancesAncestorPath() {
+        config.bspAutoBalance = .ancestors
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        let first = TestWindow.new(id: 1, parent: root)
+        let second = TestWindow.new(id: 2, parent: root)
+        insertWindowUsingBsp(second, splitting: first)
+        let third = TestWindow.new(id: 3, parent: root)
+        insertWindowUsingBsp(third, splitting: second)
+        let formerParent = third.parent as! TilingContainer
+
+        third.unbindFromParent()
+        rebalanceBspAfterTopologyChange(around: [formerParent])
+
+        XCTAssertEqual(root.children[0].getWeight(.h), 960, accuracy: 0.001)
+        XCTAssertEqual(root.children[1].getWeight(.h), 960, accuracy: 0.001)
+        config.enableNormalizationFlattenContainers = true
+        workspace.normalizeContainers()
+        assertEquals(root.layoutDescription, .h_tiles([.window(1), .window(2)]))
+    }
+
     func testEstimatedRectWorksBeforeFirstLayoutPass() {
         let root = focus.workspace.rootTilingContainer
         let first = TestWindow.new(id: 1, parent: root)

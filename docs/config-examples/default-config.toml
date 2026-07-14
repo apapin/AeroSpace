@@ -24,6 +24,12 @@ enable-normalization-opposite-orientation-for-nested-containers = true
 # axis follows the longest side of that leaf.
 enable-bsp-layout = false
 
+# Rebalance BSP slots after structural changes.
+# 'ancestors' updates only the changed paths and preserves unrelated manual ratios.
+# 'workspace' equalizes the area of every BSP slot in the workspace.
+# Possible values: off|ancestors|workspace
+bsp-auto-balance = 'off'
+
 # See: https://nikitabobko.github.io/AeroSpace/guide#layouts
 # The 'accordion-padding' specifies the size of accordion padding
 # You can set 0 to disable the padding feature

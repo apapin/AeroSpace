@@ -49,6 +49,7 @@ struct Config: ConvenienceMutable {
     var accordionPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
     var enableBspLayout: Bool = false
+    var bspAutoBalance: BspAutoBalance = .off
     var mouseDropAction: MouseDropAction = .swap
     var persistentWorkspaces: OrderedSet<String> = []
     var execOnWorkspaceChange: [String] = [] // todo deprecate
@@ -89,6 +90,12 @@ enum DefaultContainerOrientation: String {
 enum MouseDropAction: String, CaseIterable {
     case swap
     case stack
+}
+
+enum BspAutoBalance: String, CaseIterable {
+    case off
+    case ancestors
+    case workspace
 }
 
 enum DeprecatedMouseDragDropAction: String, CaseIterable {

@@ -25,6 +25,7 @@ extension Window {
 func stackWindow(_ source: Window, onto target: Window) {
     guard source !== target, source.bspSlot !== target.bspSlot else { return }
 
+    let sourceParent = source.parent as? TilingContainer
     source.unbindFromParent()
     if let targetStack = target.stackContainer {
         source.bind(to: targetStack, adaptiveWeight: 1, index: INDEX_BIND_LAST)
@@ -42,6 +43,7 @@ func stackWindow(_ source: Window, onto target: Window) {
         source.bind(to: stack, adaptiveWeight: 1, index: 1)
     }
     source.markAsMostRecentChild()
+    rebalanceBspAfterTopologyChange(around: [sourceParent, source].compactMap { $0 })
 }
 
 /// Swap BSP leaves rather than individual windows. In particular, dropping a
