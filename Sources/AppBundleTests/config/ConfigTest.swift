@@ -625,6 +625,17 @@ final class ConfigTest: XCTestCase {
         )
     }
 
+    func testParseMouseDragDropAction() {
+        let result = parseConfig(
+            """
+            mouse-drag-drop-action = 'reparent'
+            """,
+        )
+        assertEquals(result.errors, [])
+        assertEquals(result.config.mouseDragDropAction, .reparent)
+        assertEquals(parseConfig("").config.mouseDragDropAction, .swap)
+    }
+
     func testDeprecatedIndentForNestedContainers() {
         let errors = parseConfig(
             """

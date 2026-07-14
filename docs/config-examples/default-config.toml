@@ -21,7 +21,7 @@ auto-reload-config = false
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true
 # Opt-in BSP normalization. Folds any 'tiles' container with more than two
-# children into a right-deep binary tree on every workspace refresh.
+# children into a focus-aware binary tree on every workspace refresh.
 # See: https://github.com/nikitabobko/AeroSpace/issues/260
 enable-normalization-bsp-shape = false
 
@@ -37,6 +37,12 @@ default-root-container-layout = 'tiles'
 # 'auto' means: wide monitor (anything wider than high) gets horizontal orientation,
 #               tall monitor (anything higher than wide) gets vertical orientation
 default-root-container-orientation = 'auto'
+
+# Possible values: swap|reparent
+# 'swap' exchanges the dragged window with the window under the pointer.
+# 'reparent' keeps center drops as swaps, while drops near an edge create or
+# reuse a horizontal/vertical split in that direction.
+mouse-drag-drop-action = 'swap'
 
 # Mouse follows focus when focused monitor changes
 # Drop it from your config, if you don't like this behavior

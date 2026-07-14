@@ -90,8 +90,10 @@ extension TilingContainer {
             // orientation. The wrapper itself is correct by construction
             // (its orientation is `self.opposite`), so iterate its children
             // directly rather than calling the helper on the wrapper.
-            for child in wrapper.children {
-                (child as? TilingContainer)?.normalizeOppositeOrientationForNestedContainers()
+            if config.enableNormalizationOppositeOrientationForNestedContainers {
+                for child in wrapper.children {
+                    (child as? TilingContainer)?.normalizeOppositeOrientationForNestedContainers()
+                }
             }
         }
         for child in children {

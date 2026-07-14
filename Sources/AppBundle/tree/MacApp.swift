@@ -150,8 +150,15 @@ final class MacApp: AbstractApp {
     func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
         setFrameJobs[windowId] = withWindowAsync(windowId, .cancellable) { [axApp] window, job in
-            try disableAnimations(app: axApp.threadGuarded, job) {
+            let actualSize = try disableAnimations(app: axApp.threadGuarded, job) {
                 try setFrame(window, topLeft, size, job)
+            }
+            if let requestedSize = size, let actualSize {
+                Task.startUnstructured { @MainActor in
+                    if Window.get(byId: windowId)?.learnMinimumTilingSize(requested: requestedSize, actual: actualSize) == true {
+                        scheduleCancellableCompleteRefreshSession(.ax("minimumTilingSizeLearned"))
+                    }
+                }
             }
         }
     }
@@ -160,7 +167,7 @@ final class MacApp: AbstractApp {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
         let semaphore = DispatchSemaphore(value: 0)
         let job = withWindowAsync(windowId, .nonCancellable) { [axApp] window, job in
-            try? disableAnimations(app: axApp.threadGuarded, job) {
+            _ = try? disableAnimations(app: axApp.threadGuarded, job) {
                 try setFrame(window, topLeft, size, job)
             }
             semaphore.signal()
@@ -408,14 +415,15 @@ private func getAxRect(window: AXUIElement, job: RunLoopJob) throws -> Rect? {
     return Rect(topLeftX: topLeftCorner.x, topLeftY: topLeftCorner.y, width: size.width, height: size.height)
 }
 
-private func setFrame(_ window: AXUIElement, _ topLeft: CGPoint?, _ size: CGSize?, _ job: RunLoopJob) throws {
+private func setFrame(_ window: AXUIElement, _ topLeft: CGPoint?, _ size: CGSize?, _ job: RunLoopJob) throws -> CGSize? {
     // Set size and then the position. The order is important https://github.com/nikitabobko/AeroSpace/issues/143
     //                                                        https://github.com/nikitabobko/AeroSpace/issues/335
     if let size { window.set(Ax.sizeAttr, size) }
     try job.checkCancellation()
-    if let topLeft { window.set(Ax.topLeftCornerAttr, topLeft) } else { return }
+    if let topLeft { window.set(Ax.topLeftCornerAttr, topLeft) } else { return size.flatMap { _ in window.get(Ax.sizeAttr) } }
     try job.checkCancellation()
     if let size { window.set(Ax.sizeAttr, size) }
+    return size.flatMap { _ in window.get(Ax.sizeAttr) }
 }
 
 // Some undocumented magic
