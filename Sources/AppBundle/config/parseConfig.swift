@@ -138,11 +138,11 @@ private let configParser: [String: any ParserProtocol<Config>] = [
 
     "enable-normalization-flatten-containers": Parser(\.enableNormalizationFlattenContainers, parseBool),
     "enable-normalization-opposite-orientation-for-nested-containers": Parser(\.enableNormalizationOppositeOrientationForNestedContainers, parseBool),
-    "enable-normalization-bsp-shape": Parser(\.enableNormalizationBspShape, parseBool),
+    "enable-bsp-layout": Parser(\.enableBspLayout, parseBool),
 
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
     "default-root-container-orientation": Parser(\.defaultRootContainerOrientation, parseDefaultContainerOrientation),
-    "mouse-drag-drop-action": Parser(\.mouseDragDropAction, parseMouseDragDropAction),
+    "mouse-drop-action": Parser(\.mouseDropAction, parseMouseDropAction),
 
     "start-at-login": Parser(\.startAtLogin, parseBool),
     "auto-reload-config": Parser(\.autoReloadConfig, parseBool),
@@ -420,8 +420,8 @@ private func parseDefaultContainerOrientation(_ raw: OrderedJson, _ backtrace: C
     }
 }
 
-private func parseMouseDragDropAction(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<MouseDragDropAction> {
-    parseString(raw, backtrace).flatMap { parseEnum($0, MouseDragDropAction.self).toParsedConfig(backtrace) }
+private func parseMouseDropAction(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<MouseDropAction> {
+    parseString(raw, backtrace).flatMap { parseEnum($0, MouseDropAction.self).toParsedConfig(backtrace) }
 }
 
 extension ResOrStr where Failure == String {

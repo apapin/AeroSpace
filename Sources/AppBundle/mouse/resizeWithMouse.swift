@@ -26,8 +26,8 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
 @MainActor
 func resetManipulatedWithMouseIfPossible() async throws {
     if currentlyManipulatedWithMouseWindowId != nil {
+        commitPendingMouseDropIfPossible()
         currentlyManipulatedWithMouseWindowId = nil
-        resetMoveWithMouseState()
         for workspace in Workspace.all {
             workspace.resetResizeWeightBeforeResizeRecursive()
         }

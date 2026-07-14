@@ -51,91 +51,148 @@ enum MouseDropZone: Equatable {
     case edge(CardinalDirection)
 }
 
-private struct MouseDragAction: Equatable {
-    let draggedWindowId: UInt32
-    let targetWindowId: UInt32
-    let dropZone: MouseDropZone
+enum MouseDropOperation: Equatable {
+    case swap(targetWindowId: UInt32)
+    case warp(targetWindowId: UInt32, direction: CardinalDirection)
+    case moveToWorkspace(String)
+}
+
+struct MouseDropPlan {
+    let sourceWindowId: UInt32
+    let operation: MouseDropOperation
+    let previewRect: Rect?
+}
+
+private struct MouseHitTarget {
+    let window: Window
+    let frame: Rect
 }
 
 @MainActor
-private var lastMouseDragAction: MouseDragAction? = nil
+private var pendingMouseDropPlan: MouseDropPlan? = nil
+
+@MainActor
+private var mouseDragSourceWindowId: UInt32? = nil
 
 @MainActor
 func resetMoveWithMouseState() {
-    lastMouseDragAction = nil
+    pendingMouseDropPlan = nil
+    mouseDragSourceWindowId = nil
+    if !isUnitTest {
+        MouseDropPreviewPanel.shared.hide()
+    }
 }
 
 @MainActor
-private func shouldPerformMouseDragAction(_ action: MouseDragAction) -> Bool {
-    if lastMouseDragAction == action { return false }
-    lastMouseDragAction = action
-    return true
+func commitPendingMouseDropIfPossible() {
+    defer { resetMoveWithMouseState() }
+    guard let sourceWindowId = mouseDragSourceWindowId,
+          let window = Window.get(byId: sourceWindowId) else { return }
+
+    // Recompute from the release position. AX move notifications can lag
+    // behind the pointer, and a transactional drop must use the final target.
+    let finalPlan = currentMouseDropPlan(for: window)
+    guard let finalPlan else { return }
+    commitMouseDropPlan(finalPlan)
 }
 
 @MainActor
 private func moveTilingWindow(_ window: Window) {
     currentlyManipulatedWithMouseWindowId = window.windowId
-    window.lastAppliedLayoutPhysicalRect = nil
-    let mouseLocation = mouseLocation
-    let targetWorkspace = mouseLocation.monitorApproximation.activeWorkspace
-    let target = mouseLocation
-        .findWindowRecursively(in: targetWorkspace.rootTilingContainer, virtual: false, fullscreenCoversAll: false)?
-        .takeIf { $0 != window }
-
-    guard config.mouseDragDropAction == .reparent else {
-        resetMoveWithMouseState()
-        moveTilingWindowUsingSwap(window, targetWorkspace, target, mouseLocation)
-        return
-    }
-
-    guard let target, let targetRect = target.lastAppliedLayoutPhysicalRect else {
-        resetMoveWithMouseState()
-        if targetWorkspace != window.nodeWorkspace {
-            window.bind(to: targetWorkspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: 0)
+    mouseDragSourceWindowId = window.windowId
+    pendingMouseDropPlan = currentMouseDropPlan(for: window)
+    if !isUnitTest {
+        if let previewRect = pendingMouseDropPlan?.previewRect {
+            MouseDropPreviewPanel.shared.show(previewRect)
+        } else {
+            MouseDropPreviewPanel.shared.hide()
         }
-        return
-    }
-
-    let dropZone = mouseLocation.dropZone(in: targetRect)
-    let action = MouseDragAction(
-        draggedWindowId: window.windowId,
-        targetWindowId: target.windowId,
-        dropZone: dropZone,
-    )
-    guard shouldPerformMouseDragAction(action) else { return }
-
-    switch dropZone {
-        case .center where targetWorkspace == window.nodeWorkspace:
-            swapWindows(mruDominant: window, target)
-        case .center:
-            moveTilingWindowUsingSwap(window, targetWorkspace, target, mouseLocation)
-        case .edge(let direction):
-            reparentWindowForMouseDrop(window, relativeTo: target, direction: direction)
     }
 }
 
 @MainActor
-private func moveTilingWindowUsingSwap(
-    _ window: Window,
-    _ targetWorkspace: Workspace,
-    _ swapTarget: Window?,
-    _ mouseLocation: CGPoint,
-) {
-    if targetWorkspace != window.nodeWorkspace { // Move window to a different monitor
-        let index: Int = if let swapTarget, let parent = swapTarget.parent as? TilingContainer, let targetRect = swapTarget.lastAppliedLayoutPhysicalRect {
-            mouseLocation.getProjection(parent.orientation) >= targetRect.center.getProjection(parent.orientation)
-                ? swapTarget.ownIndex.orDie() + 1
-                : swapTarget.ownIndex.orDie()
-        } else {
-            0
+private func currentMouseDropPlan(for window: Window) -> MouseDropPlan? {
+    let location = mouseLocation
+    let targetWorkspace = location.monitorApproximation.activeWorkspace
+    let target = topmostTilingWindow(
+        at: location,
+        in: targetWorkspace,
+        excluding: window.windowId,
+    )
+    return makeMouseDropPlan(
+        source: window,
+        targetWorkspace: targetWorkspace,
+        target: target?.window,
+        targetRect: target?.frame,
+        location: location,
+    )
+}
+
+@MainActor
+func makeMouseDropPlan(
+    source: Window,
+    targetWorkspace: Workspace,
+    target: Window?,
+    targetRect: Rect?,
+    location: CGPoint,
+) -> MouseDropPlan? {
+    if let target, target !== source, let targetRect {
+        let zone = location.dropZone(in: targetRect)
+        let operation: MouseDropOperation = switch zone {
+            case .center:
+                switch config.mouseDropAction {
+                    case .swap: .swap(targetWindowId: target.windowId)
+                }
+            case .edge(let direction):
+                .warp(targetWindowId: target.windowId, direction: direction)
         }
-        window.bind(
-            to: swapTarget?.parent ?? targetWorkspace.rootTilingContainer,
-            adaptiveWeight: WEIGHT_AUTO,
-            index: index,
+        return MouseDropPlan(
+            sourceWindowId: source.windowId,
+            operation: operation,
+            previewRect: targetRect.previewRect(for: zone),
         )
-    } else if let swapTarget {
-        swapWindows(mruDominant: window, swapTarget)
+    }
+
+    guard targetWorkspace != source.nodeWorkspace else { return nil }
+    return MouseDropPlan(
+        sourceWindowId: source.windowId,
+        operation: .moveToWorkspace(targetWorkspace.name),
+        previewRect: nil,
+    )
+}
+
+@MainActor
+func commitMouseDropPlan(_ plan: MouseDropPlan) {
+    guard let source = Window.get(byId: plan.sourceWindowId) else { return }
+    switch plan.operation {
+        case .swap(let targetWindowId):
+            guard let target = Window.get(byId: targetWindowId) else { return }
+            swapWindows(mruDominant: source, target)
+        case .warp(let targetWindowId, let direction):
+            guard let target = Window.get(byId: targetWindowId) else { return }
+            reparentWindowForMouseDrop(source, relativeTo: target, direction: direction)
+        case .moveToWorkspace(let workspaceName):
+            moveWindowForMouseDrop(source, to: Workspace.get(byName: workspaceName))
+    }
+}
+
+@MainActor
+private func moveWindowForMouseDrop(_ window: Window, to workspace: Workspace) {
+    guard workspace != window.nodeWorkspace else { return }
+    let target = workspace.mostRecentWindowRecursive
+    if let target,
+       let targetParent = target.parent as? TilingContainer,
+       targetParent.layout == .tiles,
+       config.enableBspLayout
+    {
+        window.bind(
+            to: targetParent,
+            adaptiveWeight: WEIGHT_AUTO,
+            index: target.ownIndex.orDie() + 1,
+        )
+        insertWindowUsingBsp(window, splitting: target)
+    } else {
+        window.bind(to: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: 0)
     }
 }
 
@@ -179,7 +236,6 @@ func reparentWindowForMouseDrop(
         .tiles,
         index: targetBinding.index,
     )
-    wrapper.preserveMouseDropOrientation()
     if placeAfterTarget {
         target.bind(to: wrapper, adaptiveWeight: 1, index: 0)
         window.bind(to: wrapper, adaptiveWeight: 1, index: 1)
@@ -188,6 +244,43 @@ func reparentWindowForMouseDrop(
         target.bind(to: wrapper, adaptiveWeight: 1, index: 1)
     }
     window.markAsMostRecentChild()
+}
+
+@MainActor
+private func topmostTilingWindow(
+    at point: CGPoint,
+    in workspace: Workspace,
+    excluding excludedWindowId: UInt32,
+) -> MouseHitTarget? {
+    let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
+    if let windowList = CGWindowListCopyWindowInfo(options, CGWindowID(0)) as? [CFDictionary] {
+        for rawInfo in windowList {
+            let info = rawInfo as NSDictionary
+            guard let number = info[kCGWindowNumber] as? NSNumber else { continue }
+            let windowId = number.uint32Value
+            guard windowId != excludedWindowId,
+                  let window = Window.get(byId: windowId),
+                  window.nodeWorkspace == workspace else { continue }
+            guard case .tilingContainer = window.windowParentCases else { continue }
+            guard let boundsDictionary = info[kCGWindowBounds] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsDictionary as CFDictionary) else { continue }
+            let frame = Rect(
+                topLeftX: bounds.origin.x,
+                topLeftY: bounds.origin.y,
+                width: bounds.width,
+                height: bounds.height,
+            )
+            if frame.contains(point) {
+                return MouseHitTarget(window: window, frame: frame)
+            }
+        }
+    }
+
+    guard let window = point
+        .findWindowRecursively(in: workspace.rootTilingContainer, virtual: false, fullscreenCoversAll: false)?
+        .takeIf({ $0.windowId != excludedWindowId }),
+        let frame = window.lastAppliedLayoutPhysicalRect else { return nil }
+    return MouseHitTarget(window: window, frame: frame)
 }
 
 @MainActor
@@ -215,6 +308,23 @@ extension CGPoint {
             return .center
         }
         return .edge(closest.direction)
+    }
+}
+
+extension Rect {
+    func previewRect(for zone: MouseDropZone) -> Rect {
+        switch zone {
+            case .center:
+                self
+            case .edge(.left):
+                Rect(topLeftX: topLeftX, topLeftY: topLeftY, width: width / 2, height: height)
+            case .edge(.right):
+                Rect(topLeftX: topLeftX + width / 2, topLeftY: topLeftY, width: width / 2, height: height)
+            case .edge(.up):
+                Rect(topLeftX: topLeftX, topLeftY: topLeftY, width: width, height: height / 2)
+            case .edge(.down):
+                Rect(topLeftX: topLeftX, topLeftY: topLeftY + height / 2, width: width, height: height / 2)
+        }
     }
 }
 

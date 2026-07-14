@@ -625,15 +625,18 @@ final class ConfigTest: XCTestCase {
         )
     }
 
-    func testParseMouseDragDropAction() {
+    func testParseBspAndMouseDropAction() {
         let result = parseConfig(
             """
-            mouse-drag-drop-action = 'reparent'
+            enable-bsp-layout = true
+            mouse-drop-action = 'swap'
             """,
         )
         assertEquals(result.errors, [])
-        assertEquals(result.config.mouseDragDropAction, .reparent)
-        assertEquals(parseConfig("").config.mouseDragDropAction, .swap)
+        assertTrue(result.config.enableBspLayout)
+        assertEquals(result.config.mouseDropAction, .swap)
+        assertFalse(parseConfig("").config.enableBspLayout)
+        assertEquals(parseConfig("").config.mouseDropAction, .swap)
     }
 
     func testDeprecatedIndentForNestedContainers() {

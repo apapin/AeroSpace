@@ -15,6 +15,76 @@ final class MoveWithMouseTest: XCTestCase {
         assertEquals(CGPoint(x: 50, y: 90).dropZone(in: rect), .edge(.down))
     }
 
+    func testCenterDropPlanDoesNotMutateUntilCommit() {
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let source = TestWindow.new(id: 1, parent: root)
+        let target = TestWindow.new(id: 2, parent: root)
+        let targetRect = Rect(topLeftX: 100, topLeftY: 200, width: 800, height: 600)
+
+        let plan = makeMouseDropPlan(
+            source: source,
+            targetWorkspace: workspace,
+            target: target,
+            targetRect: targetRect,
+            location: targetRect.center,
+        )
+
+        XCTAssertEqual(plan?.operation, .swap(targetWindowId: 2))
+        XCTAssertEqual(plan?.previewRect?.topLeftX, 100)
+        XCTAssertEqual(plan?.previewRect?.topLeftY, 200)
+        XCTAssertEqual(plan?.previewRect?.width, 800)
+        XCTAssertEqual(plan?.previewRect?.height, 600)
+        assertEquals(root.layoutDescription, .h_tiles([.window(1), .window(2)]))
+
+        commitMouseDropPlan(plan!)
+
+        assertEquals(root.layoutDescription, .h_tiles([.window(2), .window(1)]))
+    }
+
+    func testEdgeDropPlanPreviewsHalfAndMutatesOnceCommitted() {
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let source = TestWindow.new(id: 1, parent: root)
+        let target = TestWindow.new(id: 2, parent: root)
+        let targetRect = Rect(topLeftX: 100, topLeftY: 200, width: 800, height: 600)
+
+        let plan = makeMouseDropPlan(
+            source: source,
+            targetWorkspace: workspace,
+            target: target,
+            targetRect: targetRect,
+            location: CGPoint(x: 899, y: 500),
+        )
+
+        XCTAssertEqual(plan?.operation, .warp(targetWindowId: 2, direction: .right))
+        XCTAssertEqual(plan?.previewRect?.topLeftX, 500)
+        XCTAssertEqual(plan?.previewRect?.topLeftY, 200)
+        XCTAssertEqual(plan?.previewRect?.width, 400)
+        XCTAssertEqual(plan?.previewRect?.height, 600)
+        assertEquals(root.layoutDescription, .h_tiles([.window(1), .window(2)]))
+
+        commitMouseDropPlan(plan!)
+
+        assertEquals(root.layoutDescription, .h_tiles([.window(2), .window(1)]))
+    }
+
+    func testDropWithoutAValidTargetOnSameWorkspaceCancels() {
+        let workspace = Workspace.get(byName: name)
+        let source = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+
+        let plan = makeMouseDropPlan(
+            source: source,
+            targetWorkspace: workspace,
+            target: nil,
+            targetRect: nil,
+            location: .zero,
+        )
+
+        XCTAssertNil(plan)
+        assertEquals(workspace.rootTilingContainer.layoutDescription, .h_tiles([.window(1)]))
+    }
+
     func testPerpendicularDropCreatesDirectionalSplit() {
         let root = Workspace.get(byName: name).rootTilingContainer
         TestWindow.new(id: 1, parent: root)
@@ -67,7 +137,7 @@ final class MoveWithMouseTest: XCTestCase {
     }
 
     func testSameAxisDropSurvivesOppositeOrientationNormalization() {
-        config.enableNormalizationBspShape = true
+        config.enableBspLayout = true
         config.enableNormalizationOppositeOrientationForNestedContainers = true
         let workspace = Workspace.get(byName: name)
         let root = workspace.rootTilingContainer

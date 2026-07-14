@@ -19,7 +19,7 @@ final class MacWindow: Window {
     static func getOrRegister(windowId: UInt32, macApp: MacApp) async throws -> MacWindow {
         if let existing = allWindowsMap[windowId] { return existing }
         let rect = try await macApp.getAxRect(windowId, .cancellable)
-        let data = try await unbindAndGetBindingDataForNewWindow(
+        let placement = try await unbindAndGetPlacementForNewWindow(
             windowId,
             macApp,
             isStartup
@@ -31,8 +31,12 @@ final class MacWindow: Window {
 
         // atomic synchronous section
         if let existing = allWindowsMap[windowId] { return existing }
+        let data = placement.binding
         let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size, parent: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
         allWindowsMap[windowId] = window
+        if let bspTarget = placement.bspTarget {
+            insertWindowUsingBsp(window, splitting: bspTarget)
+        }
 
         try await debugWindowsIfRecording(window, .cancellable)
         if try await !restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window) {
@@ -202,40 +206,61 @@ final class MacWindow: Window {
 extension Window {
     @MainActor
     func relayoutWindow(on workspace: Workspace, _ cm: CancellationMode, forceTile: Bool = false) async throws {
-        let data = forceTile
-            ? unbindAndGetBindingDataForNewTilingWindow(workspace, window: self)
-            : try await unbindAndGetBindingDataForNewWindow(self.asMacWindow().windowId, self.asMacWindow().macApp, workspace, window: self, cm)
+        let placement = forceTile
+            ? placementForNewTilingWindow(workspace, window: self)
+            : try await unbindAndGetPlacementForNewWindow(self.asMacWindow().windowId, self.asMacWindow().macApp, workspace, window: self, cm)
+        let data = placement.binding
         bind(to: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
+        if let bspTarget = placement.bspTarget {
+            insertWindowUsingBsp(self, splitting: bspTarget)
+        }
     }
+}
+
+private struct NewWindowPlacement {
+    let binding: BindingData
+    let bspTarget: Window?
 }
 
 // The function is private because it's unsafe. It leaves the window in unbound state
 @MainActor
-private func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?, _ cm: CancellationMode) async throws -> BindingData {
+private func unbindAndGetPlacementForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?, _ cm: CancellationMode) async throws -> NewWindowPlacement {
     let windowLevel = getWindowLevel(for: windowId)
     return switch try await macApp.getAxUiElementWindowType(windowId, windowLevel, cm) {
-        case .popup: BindingData(parent: macosPopupWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-        case .dialog: BindingData(parent: workspace.floatingWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-        case .window: unbindAndGetBindingDataForNewTilingWindow(workspace, window: window)
+        case .popup: NewWindowPlacement(
+                binding: BindingData(parent: macosPopupWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST),
+                bspTarget: nil,
+            )
+        case .dialog: NewWindowPlacement(
+                binding: BindingData(parent: workspace.floatingWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST),
+                bspTarget: nil,
+            )
+        case .window: placementForNewTilingWindow(workspace, window: window)
     }
 }
 
 // The function is private because it's unsafe. It leaves the window in unbound state
 @MainActor
-private func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> BindingData {
+private func placementForNewTilingWindow(_ workspace: Workspace, window: Window?) -> NewWindowPlacement {
     window?.unbindFromParent() // It's important to unbind to get correct data from below
     let mruWindow = workspace.mostRecentWindowRecursive
     if let mruWindow, let tilingParent = mruWindow.parent as? TilingContainer {
-        return BindingData(
-            parent: tilingParent,
-            adaptiveWeight: WEIGHT_AUTO,
-            index: mruWindow.ownIndex.orDie() + 1,
+        return NewWindowPlacement(
+            binding: BindingData(
+                parent: tilingParent,
+                adaptiveWeight: WEIGHT_AUTO,
+                index: mruWindow.ownIndex.orDie() + 1,
+            ),
+            bspTarget: config.enableBspLayout && tilingParent.layout == .tiles ? mruWindow : nil,
         )
     } else {
-        return BindingData(
-            parent: workspace.rootTilingContainer,
-            adaptiveWeight: WEIGHT_AUTO,
-            index: INDEX_BIND_LAST,
+        return NewWindowPlacement(
+            binding: BindingData(
+                parent: workspace.rootTilingContainer,
+                adaptiveWeight: WEIGHT_AUTO,
+                index: INDEX_BIND_LAST,
+            ),
+            bspTarget: nil,
         )
     }
 }

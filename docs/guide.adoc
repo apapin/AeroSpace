@@ -361,13 +361,10 @@ Configured by `enable-normalization-flatten-containers`
 . Containers that nest into each other must have opposite orientations.
 Configured by `enable-normalization-opposite-orientation-for-nested-containers`
 
-A third, opt-in normalization rewrites flat tiling subtrees into binary BSP shape:
-
-[start=3]
-. `enable-normalization-bsp-shape` (default `false`).
-When enabled, every workspace refresh folds any `tiles` container that has more than two children into a focus-aware tree of two-child containers with alternating orientation.
-This is the BSP / Fibonacci layout slot from the broader normalization framework discussed in https://github.com/nikitabobko/AeroSpace/issues/260[issue #260]: enabling it produces and preserves a Fibonacci-style tree on every refresh.
-Accordion subtrees are skipped - they remain "escape islands" inside BSP workspaces.
+`enable-bsp-layout` is not a normalization. When enabled, a new tiled window immediately splits the focused window's leaf.
+The split axis follows the leaf's longest side, and the two children initially receive equal space.
+Generic tree commands are still allowed; a repair pass only folds a temporary node with more than two children back to the binary invariant.
+Accordion subtrees remain "escape islands".
 If an application rejects a tile smaller than its native minimum size, AeroSpace remembers the rejected dimension, expands that leaf, and keeps it inside the workspace.
 At extreme depths, the expanded leaf can overlap a neighbor because the requested BSP geometry is physically too small for the application.
 
@@ -426,18 +423,18 @@ Unless you're hardcore i3 user who knows what they are doing, it's recommended t
 [#mouse-drag-drop]
 === Mouse drag and drop
 
-By default, dragging a tiled window over another tiled window swaps the two windows without changing the container tree.
+Dragging a tiled window never edits the tree while the mouse button is held.
+A translucent preview follows the current target, and exactly one operation is committed when the button is released.
+Releasing outside a valid target cancels the operation.
 
-Set `mouse-drag-drop-action = 'reparent'` to make mouse dragging tree-aware.
-The middle 50% of the target window keeps the existing swap behavior.
-The outer 25% on each edge becomes a directional drop zone:
+The middle 50% of the target uses `mouse-drop-action` (`swap` by default).
+The outer 25% on each edge is always a directional drop zone:
 
 * Left or right places the dragged window beside the target in a horizontal split.
 * Top or bottom places the dragged window beside the target in a vertical split.
 * Dropping on an edge creates a two-window split for the target and dragged window; dropping the same pair into its existing two-window split only reorders it.
 
-Tree normalizations still run after the drop.
-Mouse-created splits preserve the direction selected by the drop zone, and `enable-normalization-bsp-shape` keeps the resulting tree binary.
+Mouse-created splits preserve the direction selected by the drop zone.
 
 [#floating-windows]
 === Floating windows

@@ -24,17 +24,11 @@ final class TilingContainer: TreeNode, NonLeafTreeNodeObject { // todo consider 
     }
 }
 
-private let preserveMouseDropOrientationKey = TreeNodeUserDataKey<Bool>(key: "preserve-mouse-drop-orientation")
-
 extension TilingContainer {
     var isRootContainer: Bool { parent is Workspace }
 
-    var preservesMouseDropOrientation: Bool {
-        getUserData(key: preserveMouseDropOrientationKey) == true
-    }
-
-    func preserveMouseDropOrientation() {
-        putUserData(key: preserveMouseDropOrientationKey, data: true)
+    func setBspOrientation(_ orientation: Orientation) {
+        _orientation = orientation
     }
 
     @MainActor
@@ -42,7 +36,7 @@ extension TilingContainer {
         if orientation == targetOrientation {
             return
         }
-        if config.enableNormalizationOppositeOrientationForNestedContainers {
+        if config.enableNormalizationOppositeOrientationForNestedContainers && !config.enableBspLayout {
             var orientation = targetOrientation
             parentsWithSelf
                 .filterIsInstance(of: TilingContainer.self)
@@ -56,7 +50,7 @@ extension TilingContainer {
     }
 
     func normalizeOppositeOrientationForNestedContainers() {
-        if !preservesMouseDropOrientation && orientation == (parent as? TilingContainer)?.orientation {
+        if orientation == (parent as? TilingContainer)?.orientation {
             _orientation = orientation.opposite
         }
         for child in children {

@@ -46,8 +46,8 @@ struct Config: ConvenienceMutable {
     var automaticallyUnhideMacosHiddenApps: Bool = false
     var accordionPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
-    var enableNormalizationBspShape: Bool = false
-    var mouseDragDropAction: MouseDragDropAction = .swap
+    var enableBspLayout: Bool = false
+    var mouseDropAction: MouseDropAction = .swap
     var persistentWorkspaces: OrderedSet<String> = []
     var execOnWorkspaceChange: [String] = [] // todo deprecate
     var keyMapping = KeyMapping()
@@ -84,7 +84,6 @@ enum DefaultContainerOrientation: String {
     case horizontal, vertical, auto
 }
 
-enum MouseDragDropAction: String, CaseIterable {
+enum MouseDropAction: String, CaseIterable {
     case swap
-    case reparent
 }
