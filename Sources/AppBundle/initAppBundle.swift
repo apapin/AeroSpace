@@ -29,7 +29,7 @@ import Foundation
             layoutWorkspaces: false,
         )
         try await runLightSession(.startup, .forceRun) {
-            smartLayoutAtStartup()
+            smartLayoutAtStartup(focus.workspace)
             _ = await config.afterStartupCommand.run(.defaultEnv, .emptyStdin)
         }
     }
@@ -47,9 +47,12 @@ import Foundation
 }
 
 @MainActor
-private func smartLayoutAtStartup() {
-    let workspace = focus.workspace
+func smartLayoutAtStartup(_ workspace: Workspace) {
     let root = workspace.rootTilingContainer
+    if config.defaultRootContainerLayout == .stack {
+        root.layout = .stack
+        return
+    }
     switch root.children.count <= 3 {
         case true: root.layout = .tiles
         case false: root.layout = .accordion

@@ -647,6 +647,60 @@ final class ConfigTest: XCTestCase {
         assertEquals(parseConfig("").config.mouseDropAction, .swap)
     }
 
+    func testDeprecatedBspAndMouseDropAliases() {
+        let result = parseConfig(
+            """
+            config-version = 2
+            enable-normalization-bsp-shape = true
+            mouse-drag-drop-action = 'reparent'
+            """,
+        )
+
+        assertEquals(result.errors, [])
+        assertTrue(result.config.enableBspLayout)
+        assertEquals(result.config.mouseDropAction, .swap)
+        assertEquals(
+            result.strWarnings,
+            [
+                "[WARNING] enable-normalization-bsp-shape: Deprecated. Use 'enable-bsp-layout' instead.",
+                "[WARNING] mouse-drag-drop-action: Deprecated. Use 'mouse-drop-action' instead; legacy values 'reparent' and 'swap' both map to 'swap'.",
+            ],
+        )
+    }
+
+    func testReplacementConfigKeysWinOverDeprecatedAliasesRegardlessOfOrder() {
+        let configs = [
+            """
+            config-version = 2
+            enable-normalization-bsp-shape = true
+            enable-bsp-layout = false
+            mouse-drag-drop-action = 'reparent'
+            mouse-drop-action = 'stack'
+            """,
+            """
+            config-version = 2
+            mouse-drop-action = 'stack'
+            mouse-drag-drop-action = 'swap'
+            enable-bsp-layout = false
+            enable-normalization-bsp-shape = true
+            """,
+        ]
+
+        for rawConfig in configs {
+            let result = parseConfig(rawConfig)
+            assertEquals(result.errors, [])
+            assertFalse(result.config.enableBspLayout)
+            assertEquals(result.config.mouseDropAction, .stack)
+            assertEquals(
+                result.strWarnings,
+                [
+                    "[WARNING] enable-normalization-bsp-shape: Deprecated and ignored because 'enable-bsp-layout' is set.",
+                    "[WARNING] mouse-drag-drop-action: Deprecated and ignored because 'mouse-drop-action' is set.",
+                ],
+            )
+        }
+    }
+
     func testDeprecatedIndentForNestedContainers() {
         let errors = parseConfig(
             """

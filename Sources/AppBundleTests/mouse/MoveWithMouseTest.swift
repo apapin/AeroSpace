@@ -5,6 +5,19 @@ import XCTest
 final class MoveWithMouseTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testResizeGestureCannotBecomeAMouseDrop() {
+        defer { resetMouseManipulationTracking() }
+
+        assertTrue(beginMoveManipulation(windowId: 1))
+        assertEquals(currentMouseManipulationKind, .move)
+
+        beginResizeManipulation(windowId: 1)
+        assertEquals(currentMouseManipulationKind, .resize)
+        assertEquals(currentlyManipulatedWithMouseWindowId, 1)
+        assertFalse(beginMoveManipulation(windowId: 1))
+        assertEquals(currentMouseManipulationKind, .resize)
+    }
+
     func testDropZone() {
         let rect = Rect(topLeftX: 0, topLeftY: 0, width: 100, height: 100)
 
@@ -274,7 +287,7 @@ final class MoveWithMouseTest: XCTestCase {
     }
 
     func testSameAxisDropSurvivesOppositeOrientationNormalization() {
-        config.enableBspLayout = true
+        config.enableBspLayout = false
         config.enableNormalizationOppositeOrientationForNestedContainers = true
         let workspace = Workspace.get(byName: name)
         let root = workspace.rootTilingContainer

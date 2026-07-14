@@ -118,6 +118,38 @@ final class SwapCommandTest: XCTestCase {
         assertEquals(root.mostRecentWindowRecursive?.windowId, 1)
     }
 
+    func testSwap_DfsRelativeSkipsWindowsInTheSameStack() async {
+        let root = Workspace.get(byName: name).rootTilingContainer
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        assertEquals(TestWindow.new(id: 1, parent: stack).focusWindow(), true)
+        TestWindow.new(id: 2, parent: stack)
+        TestWindow.new(id: 3, parent: root)
+
+        let result = await parseCommand("swap dfs-next").cmdOrDie.run(.defaultEnv, .emptyStdin)
+
+        assertEquals(result.exitCode.rawValue, 0)
+        assertEquals(
+            root.layoutDescription,
+            .h_tiles([
+                .window(3),
+                .stack([.window(1), .window(2)]),
+            ]),
+        )
+        assertEquals(focus.windowOrNil?.windowId, 1)
+    }
+
+    func testSwap_DfsRelativeFailsWhenStackIsTheOnlyBspSlot() async {
+        let root = Workspace.get(byName: name).rootTilingContainer
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        assertEquals(TestWindow.new(id: 1, parent: stack).focusWindow(), true)
+        TestWindow.new(id: 2, parent: stack)
+
+        let result = await parseCommand("swap --wrap-around dfs-next").cmdOrDie.run(.defaultEnv, .emptyStdin)
+
+        assertEquals(result.exitCode.rawValue, 2)
+        assertEquals(root.layoutDescription, .h_tiles([.stack([.window(1), .window(2)])]))
+    }
+
     func testSwap_SwapFocus() async {
         let root = Workspace.get(byName: name).rootTilingContainer.apply {
             TestWindow.new(id: 1, parent: $0)

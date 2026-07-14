@@ -39,6 +39,8 @@ struct Config: ConvenienceMutable {
     var _indentForNestedContainersWithTheSameOrientation: Void = ()
     var enableNormalizationFlattenContainers: Bool = true
     var _nonEmptyWorkspacesRootContainersLayoutOnStartup: Void = ()
+    var _deprecatedEnableNormalizationBspShape: Bool? = nil
+    var _deprecatedMouseDragDropAction: DeprecatedMouseDragDropAction? = nil
     var defaultRootContainerLayout: Layout = .tiles
     var defaultRootContainerOrientation: DefaultContainerOrientation = .auto
     var startAtLogin: Bool = false
@@ -87,4 +89,9 @@ enum DefaultContainerOrientation: String {
 enum MouseDropAction: String, CaseIterable {
     case swap
     case stack
+}
+
+enum DeprecatedMouseDragDropAction: String, CaseIterable {
+    case reparent
+    case swap
 }

@@ -121,6 +121,10 @@ private let keyMappingConfigRootKey = "key-mapping"
 private let configVersionConfigRootKey = "config-version"
 private let modeConfigRootKey = "mode"
 private let persistentWorkspacesKey = "persistent-workspaces"
+private let enableBspLayoutKey = "enable-bsp-layout"
+private let mouseDropActionKey = "mouse-drop-action"
+private let deprecatedEnableNormalizationBspShapeKey = "enable-normalization-bsp-shape"
+private let deprecatedMouseDragDropActionKey = "mouse-drag-drop-action"
 
 // For every new config option you add, think:
 // 1. Does it make sense to have different value
@@ -138,11 +142,11 @@ private let configParser: [String: any ParserProtocol<Config>] = [
 
     "enable-normalization-flatten-containers": Parser(\.enableNormalizationFlattenContainers, parseBool),
     "enable-normalization-opposite-orientation-for-nested-containers": Parser(\.enableNormalizationOppositeOrientationForNestedContainers, parseBool),
-    "enable-bsp-layout": Parser(\.enableBspLayout, parseBool),
+    enableBspLayoutKey: Parser(\.enableBspLayout, parseBool),
 
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
     "default-root-container-orientation": Parser(\.defaultRootContainerOrientation, parseDefaultContainerOrientation),
-    "mouse-drop-action": Parser(\.mouseDropAction, parseMouseDropAction),
+    mouseDropActionKey: Parser(\.mouseDropAction, parseMouseDropAction),
 
     "start-at-login": Parser(\.startAtLogin, parseBool),
     "auto-reload-config": Parser(\.autoReloadConfig, parseBool),
@@ -161,6 +165,8 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),
 
     // Deprecated
+    deprecatedEnableNormalizationBspShapeKey: Parser(\._deprecatedEnableNormalizationBspShape, parseDeprecatedEnableNormalizationBspShape),
+    deprecatedMouseDragDropActionKey: Parser(\._deprecatedMouseDragDropAction, parseDeprecatedMouseDragDropAction),
     "non-empty-workspaces-root-containers-layout-on-startup": Parser(\._nonEmptyWorkspacesRootContainersLayoutOnStartup, parseStartupRootContainerLayout),
     "indent-for-nested-containers-with-the-same-orientation": Parser(\._indentForNestedContainersWithTheSameOrientation, parseIndentForNestedContainersWithTheSameOrientation),
 ]
@@ -265,6 +271,7 @@ struct ParseConfigResult {
 
     var config = rawTable.parseTable(Config(), configParser, .emptyRoot, &c)
     config.configVersion = configVersion
+    applyDeprecatedConfigAliases(rawTable, &config, &c)
 
     if let mapping = rawTable[keyMappingConfigRootKey].flatMap({ parseKeyMapping($0, .rootKey(keyMappingConfigRootKey), &c) }) {
         config.keyMapping = mapping
@@ -315,6 +322,50 @@ struct ParseConfigResult {
         c.warnings.append(.init(.emptyRoot, msg))
     }
     return ParseConfigResult(config: config, errors: c.errors, warnings: c.warnings)
+}
+
+private func applyDeprecatedConfigAliases(
+    _ rawTable: OrderedJson.JsonDict,
+    _ config: inout Config,
+    _ c: inout ConfigParserContext,
+) {
+    if rawTable.keys.contains(deprecatedEnableNormalizationBspShapeKey) {
+        let hasReplacement = rawTable.keys.contains(enableBspLayoutKey)
+        let message = hasReplacement
+            ? "Deprecated and ignored because '\(enableBspLayoutKey)' is set."
+            : "Deprecated. Use '\(enableBspLayoutKey)' instead."
+        c.warnings.append(.init(.rootKey(deprecatedEnableNormalizationBspShapeKey), message))
+        if !hasReplacement, let value = config._deprecatedEnableNormalizationBspShape {
+            config.enableBspLayout = value
+        }
+    }
+
+    if rawTable.keys.contains(deprecatedMouseDragDropActionKey) {
+        let hasReplacement = rawTable.keys.contains(mouseDropActionKey)
+        let message = hasReplacement
+            ? "Deprecated and ignored because '\(mouseDropActionKey)' is set."
+            : "Deprecated. Use '\(mouseDropActionKey)' instead; legacy values 'reparent' and 'swap' both map to 'swap'."
+        c.warnings.append(.init(.rootKey(deprecatedMouseDragDropActionKey), message))
+        if !hasReplacement, config._deprecatedMouseDragDropAction != nil {
+            config.mouseDropAction = .swap
+        }
+    }
+}
+
+private func parseDeprecatedEnableNormalizationBspShape(
+    _ raw: OrderedJson,
+    _ backtrace: ConfigBacktrace,
+) -> ResOrConfigParseDiagnostic<Bool?> {
+    parseBool(raw, backtrace).map(Optional.some)
+}
+
+private func parseDeprecatedMouseDragDropAction(
+    _ raw: OrderedJson,
+    _ backtrace: ConfigBacktrace,
+) -> ResOrConfigParseDiagnostic<DeprecatedMouseDragDropAction?> {
+    parseString(raw, backtrace)
+        .flatMap { parseEnum($0, DeprecatedMouseDragDropAction.self).toParsedConfig(backtrace) }
+        .map(Optional.some)
 }
 
 func parseIndentForNestedContainersWithTheSameOrientation(_ _: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<Void> {

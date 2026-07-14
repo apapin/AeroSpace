@@ -27,20 +27,12 @@ struct SwapCommand: Command {
                 }
             case .dfsRelative(let nextPrev):
                 let windows = target.workspace.rootTilingContainer.allLeafWindowsRecursive
-                guard let currentIndex = windows.firstIndex(where: { $0 == target.windowOrNil }) else {
-                    return .fail
-                }
-                var targetIndex = switch nextPrev {
-                    case .dfsNext: currentIndex + 1
-                    case .dfsPrev: currentIndex - 1
-                }
-                if !(0 ..< windows.count).contains(targetIndex) {
-                    if !args.wrapAround {
-                        return .fail
-                    }
-                    targetIndex = (targetIndex + windows.count) % windows.count
-                }
-                targetWindow = windows[targetIndex]
+                targetWindow = findDfsSwapTarget(
+                    in: windows,
+                    from: currentWindow,
+                    nextPrev: nextPrev,
+                    wrapAround: args.wrapAround,
+                )
         }
 
         guard let targetWindow else {
@@ -54,4 +46,30 @@ struct SwapCommand: Command {
         }
         return .succ
     }
+}
+
+@MainActor
+private func findDfsSwapTarget(
+    in windows: [Window],
+    from currentWindow: Window,
+    nextPrev: DfsNextPrev,
+    wrapAround: Bool,
+) -> Window? {
+    guard let currentIndex = windows.firstIndex(of: currentWindow) else { return nil }
+
+    let step = nextPrev == .dfsNext ? 1 : -1
+    var candidateIndex = currentIndex
+    for _ in 0 ..< windows.count {
+        candidateIndex += step
+        if !windows.indices.contains(candidateIndex) {
+            guard wrapAround else { return nil }
+            candidateIndex = (candidateIndex + windows.count) % windows.count
+        }
+
+        let candidate = windows[candidateIndex]
+        if candidate.bspSlot !== currentWindow.bspSlot {
+            return candidate
+        }
+    }
+    return nil
 }

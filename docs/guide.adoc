@@ -373,6 +373,7 @@ Generic tree commands are still allowed; a repair pass only folds a temporary no
 Accordion subtrees remain "escape islands", and a stack is treated as one BSP leaf.
 If an application rejects a tile smaller than its native minimum size, AeroSpace remembers the rejected dimension, expands that leaf, and keeps it inside the workspace.
 At extreme depths, the expanded leaf can overlap a neighbor because the requested BSP geometry is physically too small for the application.
+The former `enable-normalization-bsp-shape` key remains accepted as a deprecated alias so existing fork configs continue to work.
 
 [.lead]
 *Example 1*
@@ -434,6 +435,7 @@ A translucent preview follows the current target, and exactly one operation is c
 Releasing outside a valid target cancels the operation.
 
 The middle 50% of the target uses `mouse-drop-action` (`swap` by default, or `stack` to combine both windows into one BSP leaf).
+The former `mouse-drag-drop-action` key remains accepted as a deprecated alias; both of its legacy values map to `swap`.
 The outer 25% on each edge is always a directional drop zone:
 
 * Left or right places the dragged window beside the target in a horizontal split.

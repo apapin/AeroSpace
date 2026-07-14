@@ -26,8 +26,12 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
 @MainActor
 func resetManipulatedWithMouseIfPossible() async throws {
     if currentlyManipulatedWithMouseWindowId != nil {
-        commitPendingMouseDropIfPossible()
-        currentlyManipulatedWithMouseWindowId = nil
+        if currentMouseManipulationKind == .move {
+            commitPendingMouseDropIfPossible()
+        } else {
+            resetMoveWithMouseState()
+        }
+        resetMouseManipulationTracking()
         for workspace in Workspace.all {
             workspace.resetResizeWeightBeforeResizeRecursive()
         }
@@ -46,6 +50,7 @@ private func resizeWithMouse(_ window: Window) async throws { // todo cover with
              .macosPopupWindowsContainer, .macosHiddenAppsWindowsContainer:
             return // Nothing to do for floating, or unconventional windows
         case .tilingContainer:
+            beginResizeManipulation(windowId: window.windowId)
             guard let rect = try await window.getAxRect(.cancellable) else { return }
             guard let lastAppliedLayoutRect = window.lastAppliedLayoutPhysicalRect else { return }
             let (lParent, lOwnIndex) = window.closestParent(hasChildrenInDirection: .left, withLayout: .tiles) ?? (nil, nil)
@@ -75,7 +80,6 @@ private func resizeWithMouse(_ window: Window) async throws { // todo cover with
                     }
                 }
             }
-            currentlyManipulatedWithMouseWindowId = window.windowId
     }
 }
 

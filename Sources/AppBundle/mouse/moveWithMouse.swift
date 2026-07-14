@@ -99,7 +99,7 @@ func commitPendingMouseDropIfPossible() {
 
 @MainActor
 private func moveTilingWindow(_ window: Window) {
-    currentlyManipulatedWithMouseWindowId = window.windowId
+    guard beginMoveManipulation(windowId: window.windowId) else { return }
     mouseDragSourceWindowId = window.windowId
     pendingMouseDropPlan = currentMouseDropPlan(for: window)
     if !isUnitTest {
@@ -245,6 +245,7 @@ func reparentWindowForMouseDrop(
         .tiles,
         index: targetBinding.index,
     )
+    wrapper.preserveMouseDropOrientation()
     if placeAfterTarget {
         targetSlot.bind(to: wrapper, adaptiveWeight: 1, index: 0)
         window.bind(to: wrapper, adaptiveWeight: 1, index: 1)
