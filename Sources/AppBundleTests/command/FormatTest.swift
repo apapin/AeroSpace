@@ -173,6 +173,9 @@ final class FormatTest: XCTestCase {
 
         root.layout = .tiles
         assertPrimitive(FormatVar.window(.windowLayout).expandFormatVar(obj: obj), .string("v_tiles"))
+
+        root.layout = .stack
+        assertPrimitive(FormatVar.window(.windowLayout).expandFormatVar(obj: obj), .string("stack"))
     }
 
     func testExpandWindowLayoutFloating() {

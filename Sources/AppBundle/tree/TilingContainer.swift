@@ -62,6 +62,7 @@ extension TilingContainer {
 enum Layout: String {
     case tiles
     case accordion
+    case stack
 }
 
 extension String {

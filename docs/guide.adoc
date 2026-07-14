@@ -296,7 +296,7 @@ WARNING: i3 has a different terminology.
 * Each container can contain arbitrary number of children nodes
 * Windows are the only possible leaf nodes. Windows contain zero children nodes
 * Every container has two properties:
-. <<layouts,Layout>> (Possible values: `tiles`, `accordion`)
+. <<layouts,Layout>> (Possible values: `tiles`, `accordion`, `stack`)
 . Orientation (Possible values: `horizontal`, `vertical`)
 
 When we say "layout of the window", we refer to the layout of the window’s parent container.
@@ -323,12 +323,13 @@ The tree structure can be changed with three commands:
 [#layouts]
 === Layouts
 
-In total, AeroSpace provides 4 possible layouts:
+In total, AeroSpace provides 5 possible layouts:
 
 - `h_tiles` horizontal tiles (in i3, it’s called "horizontal split")
 - `v_tiles` vertical tiles (in i3, it’s called "vertical split")
 - `h_accordion` horizontal accordion (analog of i3’s "tabbed layout")
 - `v_accordion` vertical accordion (analog of i3’s "stacked layout")
+- `stack` full overlap: all members occupy one BSP leaf
 
 <<tree,From the previous section>>, you’re already familiar with the `tiles` layout.
 
@@ -350,6 +351,11 @@ While in a `v_accordion`, you can navigate the windows using the `focus (up|down
 
 Accordion padding is configurable via `accordion-padding` option.
 
+A `stack` differs from an accordion because it exposes no padding or tab strip.
+Every member gets exactly the same rectangle, and the focused member is in front.
+Directional focus treats the whole stack as one BSP leaf; use `focus stack-prev`, `focus stack-next`, `focus stack-first`, `focus stack-last`, or `focus stack-recent` to select a member.
+New windows opened while a stack member is focused join that stack.
+
 [#normalization]
 === Normalization
 
@@ -364,7 +370,7 @@ Configured by `enable-normalization-opposite-orientation-for-nested-containers`
 `enable-bsp-layout` is not a normalization. When enabled, a new tiled window immediately splits the focused window's leaf.
 The split axis follows the leaf's longest side, and the two children initially receive equal space.
 Generic tree commands are still allowed; a repair pass only folds a temporary node with more than two children back to the binary invariant.
-Accordion subtrees remain "escape islands".
+Accordion subtrees remain "escape islands", and a stack is treated as one BSP leaf.
 If an application rejects a tile smaller than its native minimum size, AeroSpace remembers the rejected dimension, expands that leaf, and keeps it inside the workspace.
 At extreme depths, the expanded leaf can overlap a neighbor because the requested BSP geometry is physically too small for the application.
 
@@ -427,7 +433,7 @@ Dragging a tiled window never edits the tree while the mouse button is held.
 A translucent preview follows the current target, and exactly one operation is committed when the button is released.
 Releasing outside a valid target cancels the operation.
 
-The middle 50% of the target uses `mouse-drop-action` (`swap` by default).
+The middle 50% of the target uses `mouse-drop-action` (`swap` by default, or `stack` to combine both windows into one BSP leaf).
 The outer 25% on each edge is always a directional drop zone:
 
 * Left or right places the dragged window beside the target in a horizontal split.
@@ -435,6 +441,8 @@ The outer 25% on each edge is always a directional drop zone:
 * Dropping on an edge creates a two-window split for the target and dragged window; dropping the same pair into its existing two-window split only reorders it.
 
 Mouse-created splits preserve the direction selected by the drop zone.
+Dragging one member out of a stack through an edge extracts only that member.
+Dropping beside a stack splits beside the whole stack; swapping with a stack exchanges whole BSP leaves.
 
 [#floating-windows]
 === Floating windows

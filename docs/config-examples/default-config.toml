@@ -29,7 +29,7 @@ enable-bsp-layout = false
 # You can set 0 to disable the padding feature
 accordion-padding = 30
 
-# Possible values: tiles|accordion
+# Possible values: tiles|accordion|stack
 default-root-container-layout = 'tiles'
 
 # Possible values: horizontal|vertical|auto
@@ -39,7 +39,8 @@ default-root-container-orientation = 'auto'
 
 # Action used for the center of a mouse-drop target. Directional edge zones
 # always reinsert the dragged window beside the target.
-# Possible values: swap
+# 'stack' makes both windows occupy one full-size BSP leaf.
+# Possible values: swap|stack
 mouse-drop-action = 'swap'
 
 # Mouse follows focus when focused monitor changes

@@ -15,7 +15,7 @@ public struct FocusCmdArgs: CmdArgs {
             "--fail-if-macos-native-fullscreen": trueBoolFlag(\.failIfMacosNativeFullscreen),
             "--wrap-around": trueBoolFlag(\.wrapAroundAlias),
         ],
-        posArgs: [ArgParser(\.cardinalOrDfsDirection, upcastArgParserFun(parseCardinalOrDfsDirection))],
+        posArgs: [ArgParser(\.focusDirection, upcastArgParserFun(parseFocusDirection))],
         conflictingOptions: [
             ["--wrap-around", "--boundaries-action"],
             ["--wrap-around", "--boundaries"],
@@ -28,12 +28,15 @@ public struct FocusCmdArgs: CmdArgs {
     public var failIfMacosNativeFullscreen: Bool = false
     fileprivate var wrapAroundAlias: Bool = false
     public var dfsIndex: UInt32? = nil
-    public var cardinalOrDfsDirection: CardinalOrDfsDirection? = nil
+    public var focusDirection: FocusDirection? = nil
     public var floatingAsTiling: Bool = true
 
     public init(rawArgs: StrArrSlice, cardinalOrDfsDirection: CardinalOrDfsDirection) {
         self.commonState = .init(rawArgs)
-        self.cardinalOrDfsDirection = cardinalOrDfsDirection
+        self.focusDirection = switch cardinalOrDfsDirection {
+            case .direction(let direction): .direction(direction)
+            case .dfsRelative(let nextPrev): .dfsRelative(nextPrev)
+        }
     }
 
     public init(rawArgs: StrArrSlice, windowId: UInt32) {
@@ -63,6 +66,7 @@ public enum FocusCmdTarget {
     case windowId(UInt32)
     case dfsIndex(UInt32)
     case dfsRelative(DfsNextPrev)
+    case stack(StackFocusTarget)
 
     var isDfsRelative: Bool {
         switch self {
@@ -70,14 +74,22 @@ public enum FocusCmdTarget {
             default: false
         }
     }
+
+    var isStack: Bool {
+        switch self {
+            case .stack: true
+            default: false
+        }
+    }
 }
 
 extension FocusCmdArgs {
     public var target: FocusCmdTarget {
-        if let cardinalOrDfsDirection {
-            return switch cardinalOrDfsDirection {
+        if let focusDirection {
+            return switch focusDirection {
                 case .direction(let dir): .direction(dir)
                 case .dfsRelative(let nextPrev): .dfsRelative(nextPrev)
+                case .stack(let target): .stack(target)
             }
         }
         if let windowId {
@@ -102,8 +114,8 @@ func parseFocusCmdArgs(_ args: StrArrSlice) -> ParsedCmd<FocusCmdArgs> {
                 ? .failure("\(raw.boundaries.rawValue) and \(raw.boundariesAction.rawValue) is an invalid combination of values")
                 : .cmd(raw)
         }
-        .filter("Mandatory argument is missing. \(CardinalOrDfsDirection.unionLiteral), --window-id or --dfs-index is required") {
-            $0.cardinalOrDfsDirection != nil || $0.windowId != nil || $0.dfsIndex != nil
+        .filter("Mandatory argument is missing. \(FocusDirection.unionLiteral), --window-id or --dfs-index is required") {
+            $0.focusDirection != nil || $0.windowId != nil || $0.dfsIndex != nil
         }
         .filter("--window-id is incompatible with other options") {
             $0.windowId == nil || $0 == FocusCmdArgs(rawArgs: args, windowId: $0.windowId.orDie())
@@ -117,12 +129,19 @@ func parseFocusCmdArgs(_ args: StrArrSlice) -> ParsedCmd<FocusCmdArgs> {
             }
             return switch $0.target {
                 case .direction: true
-                case .dfsIndex, .dfsRelative, .windowId: false
+                case .dfsIndex, .dfsRelative, .stack, .windowId: false
             }
         }
         .filter("(dfs-next|dfs-prev) only supports --boundaries workspace") {
             $0.target.isDfsRelative.implies($0.boundaries == .workspace)
         }
+        .filter("Stack focus targets don't support boundary options") {
+            !$0.target.isStack || ($0.rawBoundaries == nil && $0.rawBoundariesAction == nil && !$0.wrapAroundAlias)
+        }
+}
+
+private func parseFocusDirection(i: PosArgParserInput) -> ParsedCliArgs<FocusDirection> {
+    .init(parseEnum(i.arg, FocusDirection.self), advanceBy: 1)
 }
 
 private func parseBoundariesAction(i: SubArgParserInput) -> ParsedCliArgs<FocusCmdArgs.WhenBoundariesCrossed> {

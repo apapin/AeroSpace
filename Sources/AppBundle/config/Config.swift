@@ -86,4 +86,5 @@ enum DefaultContainerOrientation: String {
 
 enum MouseDropAction: String, CaseIterable {
     case swap
+    case stack
 }

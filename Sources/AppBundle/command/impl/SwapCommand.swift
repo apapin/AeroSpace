@@ -47,7 +47,7 @@ struct SwapCommand: Command {
             return .fail
         }
 
-        swapWindows(mruDominant: currentWindow, targetWindow)
+        swapBspSlots(mruDominant: currentWindow, targetWindow)
 
         if args.swapFocus {
             return .from(bool: targetWindow.focusWindow())

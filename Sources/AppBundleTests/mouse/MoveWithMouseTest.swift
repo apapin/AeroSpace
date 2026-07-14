@@ -85,6 +85,143 @@ final class MoveWithMouseTest: XCTestCase {
         assertEquals(workspace.rootTilingContainer.layoutDescription, .h_tiles([.window(1)]))
     }
 
+    func testStackCenterDropCreatesAStackOnlyOnCommit() {
+        config.mouseDropAction = .stack
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let source = TestWindow.new(id: 1, parent: root)
+        let target = TestWindow.new(id: 2, parent: root)
+        TestWindow.new(id: 3, parent: root)
+        target.setWeight(.h, 3)
+        let targetRect = Rect(topLeftX: 100, topLeftY: 200, width: 800, height: 600)
+
+        let plan = makeMouseDropPlan(
+            source: source,
+            targetWorkspace: workspace,
+            target: target,
+            targetRect: targetRect,
+            location: targetRect.center,
+        )
+
+        XCTAssertEqual(plan?.operation, .stack(targetWindowId: 2))
+        assertEquals(root.layoutDescription, .h_tiles([.window(1), .window(2), .window(3)]))
+
+        commitMouseDropPlan(plan!)
+
+        assertEquals(
+            root.layoutDescription,
+            .h_tiles([.stack([.window(2), .window(1)]), .window(3)]),
+        )
+        XCTAssertEqual(root.children[0].getWeight(.h), 3)
+    }
+
+    func testCenterSwapExchangesSingletonWithEntireStack() {
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let source = TestWindow.new(id: 1, parent: root)
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        let target = TestWindow.new(id: 2, parent: stack)
+        TestWindow.new(id: 3, parent: stack)
+        let targetRect = Rect(topLeftX: 100, topLeftY: 200, width: 800, height: 600)
+
+        let plan = makeMouseDropPlan(
+            source: source,
+            targetWorkspace: workspace,
+            target: target,
+            targetRect: targetRect,
+            location: targetRect.center,
+        )
+        commitMouseDropPlan(plan!)
+
+        assertEquals(
+            root.layoutDescription,
+            .h_tiles([.stack([.window(2), .window(3)]), .window(1)]),
+        )
+    }
+
+    func testCenterDropFromMultiWindowStackIsNotEligible() {
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        let source = TestWindow.new(id: 1, parent: stack)
+        TestWindow.new(id: 2, parent: stack)
+        let target = TestWindow.new(id: 3, parent: root)
+        let targetRect = Rect(topLeftX: 100, topLeftY: 200, width: 800, height: 600)
+
+        let plan = makeMouseDropPlan(
+            source: source,
+            targetWorkspace: workspace,
+            target: target,
+            targetRect: targetRect,
+            location: targetRect.center,
+        )
+
+        XCTAssertNil(plan)
+    }
+
+    func testEdgeDropExtractsOneWindowFromStack() {
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        let source = TestWindow.new(id: 1, parent: stack)
+        TestWindow.new(id: 2, parent: stack)
+        let target = TestWindow.new(id: 3, parent: root)
+        let targetRect = Rect(topLeftX: 100, topLeftY: 200, width: 800, height: 600)
+
+        let plan = makeMouseDropPlan(
+            source: source,
+            targetWorkspace: workspace,
+            target: target,
+            targetRect: targetRect,
+            location: CGPoint(x: 500, y: 799),
+        )
+        commitMouseDropPlan(plan!)
+
+        assertEquals(
+            root.layoutDescription,
+            .h_tiles([
+                .stack([.window(2)]),
+                .v_tiles([.window(3), .window(1)]),
+            ]),
+        )
+
+        config.enableNormalizationFlattenContainers = true
+        workspace.normalizeContainers()
+        assertEquals(
+            root.layoutDescription,
+            .h_tiles([
+                .window(2),
+                .v_tiles([.window(3), .window(1)]),
+            ]),
+        )
+    }
+
+    func testEdgeDropSplitsBesideTheWholeTargetStack() {
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let source = TestWindow.new(id: 1, parent: root)
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        let target = TestWindow.new(id: 2, parent: stack)
+        TestWindow.new(id: 3, parent: stack)
+        let targetRect = Rect(topLeftX: 100, topLeftY: 200, width: 800, height: 600)
+
+        let plan = makeMouseDropPlan(
+            source: source,
+            targetWorkspace: workspace,
+            target: target,
+            targetRect: targetRect,
+            location: CGPoint(x: 500, y: 201),
+        )
+        commitMouseDropPlan(plan!)
+
+        assertEquals(
+            root.layoutDescription,
+            .h_tiles([
+                .v_tiles([.window(1), .stack([.window(2), .window(3)])]),
+            ]),
+        )
+    }
+
     func testPerpendicularDropCreatesDirectionalSplit() {
         let root = Workspace.get(byName: name).rootTilingContainer
         TestWindow.new(id: 1, parent: root)

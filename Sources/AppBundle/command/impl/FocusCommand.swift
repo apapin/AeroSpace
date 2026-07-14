@@ -62,6 +62,10 @@ struct FocusCommand: Command {
                     }
                 }
                 return .from(bool: windows[targetIndex].focusWindow())
+            case .stack(let stackTarget):
+                guard let window = target.windowOrNil,
+                      let windowToFocus = window.resolveStackFocusTarget(stackTarget) else { return .fail }
+                return .from(bool: windowToFocus.focusWindow())
         }
     }
 }
@@ -149,6 +153,8 @@ struct FocusCommand: Command {
                     center.getProjection(tilingParent.orientation) >= targetCenter.getProjection(tilingParent.orientation)
                         ? tilingParent.children.count
                         : 0
+                case .stack:
+                    tilingParent.children.count
             }
         } else {
             index = 0
@@ -201,11 +207,16 @@ extension TreeNode {
             case .window(let window):
                 return window
             case .tilingContainer(let container):
-                if direction.orientation == container.orientation {
-                    return (direction.isPositive ? container.children.last : container.children.first)?
-                        .findLeafWindowRecursive(snappedTo: direction)
-                } else {
-                    return mostRecentChild?.findLeafWindowRecursive(snappedTo: direction)
+                switch container.layout {
+                    case .stack:
+                        return container.mostRecentWindowRecursive
+                    case .tiles, .accordion:
+                        if direction.orientation == container.orientation {
+                            return (direction.isPositive ? container.children.last : container.children.first)?
+                                .findLeafWindowRecursive(snappedTo: direction)
+                        } else {
+                            return mostRecentChild?.findLeafWindowRecursive(snappedTo: direction)
+                        }
                 }
             case .macosMinimizedWindowsContainer, .macosFullscreenWindowsContainer,
                  .macosPopupWindowsContainer, .macosHiddenAppsWindowsContainer,

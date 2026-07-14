@@ -53,6 +53,8 @@ struct LayoutCommand: Command {
                 return changeTilingLayout(io, targetLayout: .accordion, targetOrientation: nil, node: node)
             case .tiles:
                 return changeTilingLayout(io, targetLayout: .tiles, targetOrientation: nil, node: node)
+            case .stack:
+                return changeTilingLayout(io, targetLayout: .stack, targetOrientation: nil, node: node)
             case .horizontal:
                 return changeTilingLayout(io, targetLayout: nil, targetOrientation: .h, node: node)
             case .vertical:
@@ -105,6 +107,7 @@ extension ConventionalWindowParentCases {
         return switch layout {
             case .accordion:   tilingContainerOrNil?.layout == .accordion
             case .tiles:       tilingContainerOrNil?.layout == .tiles
+            case .stack:       tilingContainerOrNil?.layout == .stack
             case .horizontal:  tilingContainerOrNil?.orientation == .h
             case .vertical:    tilingContainerOrNil?.orientation == .v
             case .h_accordion: tilingContainerOrNil.map { $0.layout == .accordion && $0.orientation == .h } == true

@@ -53,6 +53,7 @@ enum MouseDropZone: Equatable {
 
 enum MouseDropOperation: Equatable {
     case swap(targetWindowId: UInt32)
+    case stack(targetWindowId: UInt32)
     case warp(targetWindowId: UInt32, direction: CardinalDirection)
     case moveToWorkspace(String)
 }
@@ -136,12 +137,16 @@ func makeMouseDropPlan(
     targetRect: Rect?,
     location: CGPoint,
 ) -> MouseDropPlan? {
-    if let target, target !== source, let targetRect {
+    if let target, target !== source, source.bspSlot !== target.bspSlot, let targetRect {
         let zone = location.dropZone(in: targetRect)
+        if zone == .center && !source.isOnlyWindowInBspSlot {
+            return nil
+        }
         let operation: MouseDropOperation = switch zone {
             case .center:
                 switch config.mouseDropAction {
                     case .swap: .swap(targetWindowId: target.windowId)
+                    case .stack: .stack(targetWindowId: target.windowId)
                 }
             case .edge(let direction):
                 .warp(targetWindowId: target.windowId, direction: direction)
@@ -167,7 +172,10 @@ func commitMouseDropPlan(_ plan: MouseDropPlan) {
     switch plan.operation {
         case .swap(let targetWindowId):
             guard let target = Window.get(byId: targetWindowId) else { return }
-            swapWindows(mruDominant: source, target)
+            swapBspSlots(mruDominant: source, target)
+        case .stack(let targetWindowId):
+            guard let target = Window.get(byId: targetWindowId) else { return }
+            stackWindow(source, onto: target)
         case .warp(let targetWindowId, let direction):
             guard let target = Window.get(byId: targetWindowId) else { return }
             reparentWindowForMouseDrop(source, relativeTo: target, direction: direction)
@@ -202,8 +210,9 @@ func reparentWindowForMouseDrop(
     relativeTo target: Window,
     direction: CardinalDirection,
 ) {
-    if window == target { return }
-    guard let targetParent = target.parent as? TilingContainer else { return }
+    let targetSlot = target.bspSlot
+    if window === target || window.bspSlot === targetSlot { return }
+    guard let targetParent = targetSlot.parent as? TilingContainer else { return }
 
     let placeAfterTarget = direction.isPositive
     if window.parent === targetParent,
@@ -211,14 +220,14 @@ func reparentWindowForMouseDrop(
        targetParent.orientation == direction.orientation,
        targetParent.children.count == 2,
        let windowIndex = window.ownIndex,
-       let targetIndex = target.ownIndex
+       let targetIndex = targetSlot.ownIndex
     {
         if placeAfterTarget ? targetIndex + 1 == windowIndex : windowIndex + 1 == targetIndex {
             return
         }
 
         let windowBinding = window.unbindFromParent()
-        target.markAsMostRecentChild()
+        targetSlot.markAsMostRecentChild()
         window.bind(
             to: targetParent,
             adaptiveWeight: windowBinding.adaptiveWeight,
@@ -228,7 +237,7 @@ func reparentWindowForMouseDrop(
     }
 
     window.unbindFromParent()
-    let targetBinding = target.unbindFromParent()
+    let targetBinding = targetSlot.unbindFromParent()
     let wrapper = TilingContainer(
         parent: targetBinding.parent,
         adaptiveWeight: targetBinding.adaptiveWeight,
@@ -237,11 +246,11 @@ func reparentWindowForMouseDrop(
         index: targetBinding.index,
     )
     if placeAfterTarget {
-        target.bind(to: wrapper, adaptiveWeight: 1, index: 0)
+        targetSlot.bind(to: wrapper, adaptiveWeight: 1, index: 0)
         window.bind(to: wrapper, adaptiveWeight: 1, index: 1)
     } else {
         window.bind(to: wrapper, adaptiveWeight: 1, index: 0)
-        target.bind(to: wrapper, adaptiveWeight: 1, index: 1)
+        targetSlot.bind(to: wrapper, adaptiveWeight: 1, index: 1)
     }
     window.markAsMostRecentChild()
 }
@@ -281,17 +290,6 @@ private func topmostTilingWindow(
         .takeIf({ $0.windowId != excludedWindowId }),
         let frame = window.lastAppliedLayoutPhysicalRect else { return nil }
     return MouseHitTarget(window: window, frame: frame)
-}
-
-@MainActor
-func swapWindows(mruDominant window1: Window, _ window2: Window) {
-    if window1 == window2 { return }
-
-    let binding2 = window2.unbindFromParent()
-    let binding1 = window1.unbindFromParent()
-
-    window2.bind(to: binding1.parent, adaptiveWeight: binding1.adaptiveWeight, index: binding1.index)
-    window1.bind(to: binding2.parent, adaptiveWeight: binding2.adaptiveWeight, index: binding2.index)
 }
 
 extension CGPoint {
@@ -352,6 +350,8 @@ extension CGPoint {
                     (virtual ? $0.lastAppliedLayoutVirtualRect : $0.lastAppliedLayoutPhysicalRect)?.contains(point) == true
                 })
             case .accordion:
+                tree.mostRecentChild
+            case .stack:
                 tree.mostRecentChild
         }
         guard let target else { return nil }

@@ -37,6 +37,7 @@ aerospace -h;
     | focus --window-id <window_id>
     | focus --dfs-index <number>
     | focus [<focus_dfs_relative_flag>]... (dfs-next|dfs-prev) [<focus_dfs_relative_flag>]...
+    | focus (stack-prev|stack-next|stack-first|stack-last|stack-recent)
 
     | focus-back-and-forth
 
@@ -124,7 +125,7 @@ aerospace -h;
 <workspace> ::= {{{ aerospace list-workspaces --monitor all --empty no }}};
 <number> ::= {{{ true }}};
 <monitor_pattern> ::= {{{ true }}};
-<layouts> ::= h_tiles|v_tiles|h_accordion|v_accordion|tiles|accordion|horizontal|vertical|tiling|floating;
+<layouts> ::= h_tiles|v_tiles|h_accordion|v_accordion|tiles|accordion|stack|horizontal|vertical|tiling|floating;
 
 <list_workspaces1_flag> ::= --visible [no] | --empty [no] | --format <output_format> | --format <output_format> | --count | --json;
 

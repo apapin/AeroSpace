@@ -10,6 +10,7 @@ final class LayoutCommandTest: XCTestCase {
         assertNil(parseCommand("layout v_tiles h_tiles").errorOrNil)
         assertNil(parseCommand("layout tiling").errorOrNil)
         assertNil(parseCommand("layout floating tiling").errorOrNil)
+        assertNil(parseCommand("layout stack").errorOrNil)
         assertNil(parseCommand("layout --window-id 1 horizontal vertical").errorOrNil)
 
         testParseCommandFail(
@@ -60,6 +61,18 @@ final class LayoutCommandTest: XCTestCase {
         await parseCommand("layout accordion").cmdOrDie.run(.defaultEnv, .emptyStdin)
         assertEquals(root.layout, .accordion)
         assertEquals(root.layoutDescription, .h_accordion([.window(1), .window(2)]))
+    }
+
+    func testChangeLayoutToStack() async {
+        let root = Workspace.get(byName: name).rootTilingContainer.apply {
+            assertEquals(TestWindow.new(id: 1, parent: $0).focusWindow(), true)
+            TestWindow.new(id: 2, parent: $0)
+        }
+
+        await parseCommand("layout stack").cmdOrDie.run(.defaultEnv, .emptyStdin)
+
+        assertEquals(root.layout, .stack)
+        assertEquals(root.layoutDescription, .stack([.window(1), .window(2)]))
     }
 
     func testChangeBothLayoutAndOrientation() async {

@@ -59,6 +59,62 @@ final class FocusCommandTest: XCTestCase {
             "--window-id is incompatible with other options",
         )
         assertNil(parseCommand("focus --fail-if-fullscreen --fail-if-macos-native-fullscreen left").errorOrNil)
+        for target in StackFocusTarget.allCases {
+            assertNil(parseCommand("focus \(target.rawValue)").errorOrNil)
+        }
+        assertEquals(
+            parseCommand("focus --wrap-around stack-next").errorOrNil,
+            "Stack focus targets don't support boundary options",
+        )
+    }
+
+    func testStackFocusTargets() async {
+        let root = Workspace.get(byName: name).rootTilingContainer
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        let first = TestWindow.new(id: 1, parent: stack)
+        TestWindow.new(id: 2, parent: stack)
+        TestWindow.new(id: 3, parent: stack)
+        assertTrue(first.focusWindow())
+
+        assertEquals((await parseCommand("focus stack-next").cmdOrDie.run(.defaultEnv, .emptyStdin)).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+
+        assertEquals((await parseCommand("focus stack-last").cmdOrDie.run(.defaultEnv, .emptyStdin)).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 3)
+
+        assertEquals((await parseCommand("focus stack-first").cmdOrDie.run(.defaultEnv, .emptyStdin)).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 1)
+
+        assertEquals((await parseCommand("focus stack-recent").cmdOrDie.run(.defaultEnv, .emptyStdin)).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 3)
+    }
+
+    func testStackFocusDoesNotWrapAtTheEnd() async {
+        let root = Workspace.get(byName: name).rootTilingContainer
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        TestWindow.new(id: 1, parent: stack)
+        let last = TestWindow.new(id: 2, parent: stack)
+        assertTrue(last.focusWindow())
+
+        let result = await parseCommand("focus stack-next").cmdOrDie.run(.defaultEnv, .emptyStdin)
+
+        assertEquals(result.exitCode.rawValue, 2)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+    }
+
+    func testDirectionalFocusTreatsStackAsOneBspLeaf() async {
+        let root = Workspace.get(byName: name).rootTilingContainer
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stack, index: INDEX_BIND_LAST)
+        let first = TestWindow.new(id: 1, parent: stack)
+        TestWindow.new(id: 2, parent: stack)
+        TestWindow.new(id: 3, parent: root)
+        assertTrue(first.focusWindow())
+
+        await parseCommand("focus right").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        assertEquals(focus.windowOrNil?.windowId, 3)
+
+        await parseCommand("focus left").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        assertEquals(focus.windowOrNil?.windowId, 1)
     }
 
     func testFailIfFullscreen() async {

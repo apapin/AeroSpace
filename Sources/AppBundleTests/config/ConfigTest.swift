@@ -586,6 +586,14 @@ final class ConfigTest: XCTestCase {
         assertEquals(result.errors, [])
         assertEquals(result.config.defaultRootContainerLayout, .accordion)
 
+        let stackResult = parseConfig(
+            """
+            default-root-container-layout = 'stack'
+            """,
+        )
+        assertEquals(stackResult.errors, [])
+        assertEquals(stackResult.config.defaultRootContainerLayout, .stack)
+
         let listResult = parseConfig(
             """
             default-root-container-layout = 'list'
@@ -629,12 +637,12 @@ final class ConfigTest: XCTestCase {
         let result = parseConfig(
             """
             enable-bsp-layout = true
-            mouse-drop-action = 'swap'
+            mouse-drop-action = 'stack'
             """,
         )
         assertEquals(result.errors, [])
         assertTrue(result.config.enableBspLayout)
-        assertEquals(result.config.mouseDropAction, .swap)
+        assertEquals(result.config.mouseDropAction, .stack)
         assertFalse(parseConfig("").config.enableBspLayout)
         assertEquals(parseConfig("").config.mouseDropAction, .swap)
     }

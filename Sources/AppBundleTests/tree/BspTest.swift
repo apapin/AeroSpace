@@ -143,6 +143,27 @@ final class BspTest: XCTestCase {
         )
     }
 
+    func testStackIsOneBspLeafAndIsNotRepairedInternally() {
+        let workspace = focus.workspace
+        let stack = TilingContainer(
+            parent: workspace.rootTilingContainer,
+            adaptiveWeight: 1,
+            .h,
+            .stack,
+            index: INDEX_BIND_LAST,
+        )
+        for id: UInt32 in 1 ... 3 {
+            TestWindow.new(id: id, parent: stack)
+        }
+
+        workspace.normalizeContainers()
+
+        assertEquals(
+            stack.layoutDescription,
+            .stack([.window(1), .window(2), .window(3)]),
+        )
+    }
+
     func testBspModeDoesNotForceOppositeNestedOrientations() {
         config.enableNormalizationOppositeOrientationForNestedContainers = true
         let workspace = focus.workspace

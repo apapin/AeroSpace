@@ -16,6 +16,8 @@ aerospace focus [-h|--help] [--ignore-floating] [--wrap-around]
 aerospace focus [-h|--help] [--ignore-floating] [--wrap-around]
                 [--boundaries <boundary>] [--boundaries-action <action>]
                 (dfs-next|dfs-prev)
+aerospace focus [-h|--help]
+                (stack-prev|stack-next|stack-first|stack-last|stack-recent)
 aerospace focus [-h|--help] --window-id <window-id>
 aerospace focus [-h|--help] --dfs-index <dfs-index>
 
@@ -83,6 +85,11 @@ Set focus to the nearest window in the given direction.
 (dfs-next|dfs-prev)::
 Set focus to the window before or after the current window in the depth-first order (top-to-bottom and left-to-right) of windows in the current workspace tree.
 In this mode, `--boundaries` must be `workspace` (the default) and `--boundaries-action` can be set to one of `(stop|fail|wrap-around-the-workspace)`.
+
+(stack-prev|stack-next|stack-first|stack-last|stack-recent)::
+Select a window inside the current `stack` leaf.
+`stack-recent` returns to the previously focused member.
+Stack focus targets don't support boundary or wrap-around options.
 
 // end::body[]
 
