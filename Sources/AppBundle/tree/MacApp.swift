@@ -155,8 +155,13 @@ final class MacApp: AbstractApp {
             }
             if let requestedSize = size, let actualSize {
                 Task.startUnstructured { @MainActor in
-                    if Window.get(byId: windowId)?.learnMinimumTilingSize(requested: requestedSize, actual: actualSize) == true {
-                        scheduleCancellableCompleteRefreshSession(.ax("minimumTilingSizeLearned"))
+                    switch Window.get(byId: windowId)?.observeTilingSize(requested: requestedSize, actual: actualSize) {
+                        case .retry:
+                            scheduleCancellableCompleteRefreshSession(.ax("minimumTilingSizeProbe"))
+                        case .learned:
+                            scheduleCancellableCompleteRefreshSession(.ax("minimumTilingSizeLearned"))
+                        case .accepted, nil:
+                            break
                     }
                 }
             }

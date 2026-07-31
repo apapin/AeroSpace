@@ -374,8 +374,9 @@ Accordion subtrees remain "escape islands", and a stack is treated as one BSP le
 `bsp-auto-balance = 'ancestors'` gives each affected subtree space proportional to its BSP-leaf count after an insertion, removal, stack, or directional mouse drop.
 For example, splitting one side of a two-window layout changes the outer ratio from `1:1` to `1:2`, so all three slots receive equal virtual area while ratios inside unrelated subtrees remain untouched.
 `bsp-auto-balance = 'workspace'` reapplies that rule recursively to every tiled subtree; `off` preserves split sizes exactly as before.
-If an application rejects a tile smaller than its native minimum size, AeroSpace remembers the rejected dimension, expands that leaf, and keeps it inside the workspace.
-At extreme depths, the expanded leaf can overlap a neighbor because the requested BSP geometry is physically too small for the application.
+If an application consistently rejects a tile smaller than its native minimum size, AeroSpace confirms the rejected dimension across multiple layout passes, then gives the closest enclosing split enough space for that leaf.
+The confirmation prevents a stale Accessibility API read from becoming a bogus minimum, while adjusting the split prevents a constrained window from silently overlapping its neighbors.
+If the combined native minimum sizes exceed the workspace itself, a non-overlapping tiled layout is physically impossible.
 The former `enable-normalization-bsp-shape` key remains accepted as a deprecated alias so existing fork configs continue to work.
 
 [.lead]
