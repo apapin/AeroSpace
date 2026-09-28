@@ -116,12 +116,23 @@ extension TilingContainer {
         var point = point
         var virtualPoint = virtual.topLeftCorner
 
-        guard let delta = ((orientation == .h ? width : height) - CGFloat(children.sumOfDouble { $0.getWeight(orientation) }))
+        let available = orientation == .h ? width : height
+        guard let delta = (available - CGFloat(children.sumOfDouble { $0.getWeight(orientation) }))
             .div(children.count) else { return }
+
+        for child in children {
+            child.setWeight(orientation, child.getWeight(orientation) + delta)
+        }
+        // Reserve learned minimum sizes before placing any child, so that an
+        // app's minimum never has to be reconciled after the fact.
+        reserveMinimumTilingLengths(
+            available: available,
+            innerGap: context.resolvedGaps.inner.get(orientation).toDouble(),
+            accordionPadding: CGFloat(config.accordionPadding),
+        )
 
         let lastIndex = children.indices.last
         for (i, child) in children.enumerated() {
-            child.setWeight(orientation, child.getWeight(orientation) + delta)
             let rawGap = context.resolvedGaps.inner.get(orientation).toDouble()
             // Gaps. Consider 4 cases:
             // 1. Multiple children. Layout first child

@@ -19,6 +19,8 @@ aerospace balance-sizes [-h|--help] [--workspace <workspace>]
 // tag::body[]
 {manpurpose}
 
+The command also forgets the minimum window sizes that AeroSpace learned from applications in the workspace, so that they are measured again.
+
 // =========================================================== Options
 include::./util/conditional-options-header.adoc[]
 

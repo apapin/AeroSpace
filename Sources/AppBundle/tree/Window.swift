@@ -8,6 +8,7 @@ open class Window: TreeNode, Hashable {
     private var learnedMinimumTilingSize: CGSize = .zero
     private var minimumTilingWidthCandidate: MinimumTilingSizeCandidate?
     private var minimumTilingHeightCandidate: MinimumTilingSizeCandidate?
+    private var minimumTilingProbeStreak = 0
     var isFullscreen: Bool = false
     var noOuterGapsInFullscreen: Bool = false
     var layoutReason: LayoutReason = .standard
@@ -78,34 +79,45 @@ extension Window {
             candidate: &minimumTilingHeightCandidate,
         )
         if widthResult == .learned || heightResult == .learned {
+            minimumTilingProbeStreak = 0
             return .learned
         }
-        return widthResult == .retry || heightResult == .retry ? .retry : .accepted
+        guard widthResult == .retry || heightResult == .retry else {
+            minimumTilingProbeStreak = 0
+            return .accepted
+        }
+        // Each probe schedules a refresh. An app whose reported size never
+        // settles must not keep AeroSpace refreshing forever.
+        minimumTilingProbeStreak += 1
+        return minimumTilingProbeStreak <= minimumTilingSizeMaxProbeStreak ? .retry : .accepted
     }
 
-    /// Expand an undersized BSP leaf to the minimum learned from the app and
-    /// shift it back inside the workspace. First grow the closest matching
-    /// ancestor slot by taking space from its siblings so a real minimum does
-    /// not turn into a persistent overlap.
+    /// The minimum size learned from the app, or zero for a dimension it has
+    /// never refused. Tiled layout reserves this much space before placing
+    /// the window (see `reserveMinimumTilingLengths`).
+    @MainActor
+    var minimumTilingSize: CGSize { learnedMinimumTilingSize }
+
+    /// Forget the learned minimum so the next layouts measure it again. A
+    /// learned minimum only grows, so an explicit re-measure is the way to
+    /// recover space after an app's own minimum shrinks.
+    @MainActor
+    func forgetMinimumTilingSize() {
+        learnedMinimumTilingSize = .zero
+        minimumTilingWidthCandidate = nil
+        minimumTilingHeightCandidate = nil
+        minimumTilingProbeStreak = 0
+    }
+
+    /// Enlarge the frame to the minimum learned from the app and shift it back
+    /// inside the workspace. Layout already reserves the minimum in the
+    /// enclosing splits, so this only changes the frame when the minimums of
+    /// neighboring windows cannot all fit, in which case overlap is
+    /// unavoidable. It must not change weights or schedule refreshes: doing so
+    /// from inside a layout pass made two constrained neighbors trade space
+    /// back and forth forever.
     @MainActor
     func resolveTilingFrame(_ requested: Rect, within bounds: Rect) -> Rect {
-        var didAdjustWeights = false
-        if learnedMinimumTilingSize.width > requested.width + minimumTilingSizeTolerance {
-            didAdjustWeights = growTilingSlot(
-                by: learnedMinimumTilingSize.width - requested.width,
-                orientation: .h,
-            ) || didAdjustWeights
-        }
-        if learnedMinimumTilingSize.height > requested.height + minimumTilingSizeTolerance {
-            didAdjustWeights = growTilingSlot(
-                by: learnedMinimumTilingSize.height - requested.height,
-                orientation: .v,
-            ) || didAdjustWeights
-        }
-        if didAdjustWeights, !isUnitTest {
-            scheduleCancellableCompleteRefreshSession(.ax("minimumTilingSizeReconciled"))
-        }
-
         let width = max(requested.width, learnedMinimumTilingSize.width)
         let height = max(requested.height, learnedMinimumTilingSize.height)
         let maxX = max(bounds.minX, bounds.maxX - width)
@@ -117,37 +129,11 @@ extension Window {
             height: height,
         )
     }
-
-    @MainActor
-    private func growTilingSlot(by requestedDelta: CGFloat, orientation: Orientation) -> Bool {
-        guard requestedDelta > minimumTilingSizeTolerance else { return false }
-        guard let slot = parentsWithSelf.first(where: {
-            guard let parent = $0.parent as? TilingContainer else { return false }
-            return parent.layout == .tiles && parent.orientation == orientation && parent.children.count > 1
-        }), let parent = slot.parent as? TilingContainer else { return false }
-
-        let siblings = parent.children.filter { $0 !== slot }
-        let capacities = siblings.map { max(0, $0.getWeight(orientation) - minimumTilingSiblingWeight) }
-        let totalCapacity = capacities.reduce(0, +)
-        let appliedDelta = min(requestedDelta, totalCapacity)
-        guard appliedDelta > minimumTilingSizeTolerance else { return false }
-
-        slot.setWeight(orientation, slot.getWeight(orientation) + appliedDelta)
-        var remaining = appliedDelta
-        for (index, sibling) in siblings.enumerated() {
-            let reduction = index == siblings.indices.last
-                ? remaining
-                : appliedDelta * capacities[index] / totalCapacity
-            sibling.setWeight(orientation, sibling.getWeight(orientation) - reduction)
-            remaining -= reduction
-        }
-        return true
-    }
 }
 
 private let minimumTilingSizeTolerance: CGFloat = 1
 private let minimumTilingSizeConfirmationCount = 3
-private let minimumTilingSiblingWeight: CGFloat = 1
+private let minimumTilingSizeMaxProbeStreak = 8
 
 private func observeMinimumTilingDimension(
     requested: CGFloat,

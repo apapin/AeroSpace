@@ -22,4 +22,19 @@ final class BalanceSizesCommandTest: XCTestCase {
             assertEquals(window.getWeight(workspace.rootTilingContainer.orientation), 1)
         }
     }
+
+    func testBalanceSizesMeasuresMinimumSizesAgain() async {
+        let workspace = Workspace.get(byName: name)
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        for _ in 0 ..< 3 {
+            window.observeTilingSize(requested: CGSize(width: 960, height: 1079), actual: CGSize(width: 1200, height: 1079))
+        }
+        assertEquals(window.minimumTilingSize, CGSize(width: 1200, height: 0))
+
+        await parseCommand("balance-sizes").cmdOrDie
+            .run(.defaultEnv.withWorkspaceName(name), .emptyStdin)
+
+        assertEquals(window.minimumTilingSize, .zero)
+    }
 }

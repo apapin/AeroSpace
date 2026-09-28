@@ -8,6 +8,11 @@ struct BalanceSizesCommand: Command {
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> BinaryExitCode {
         guard let target = args.resolveTargetOrReportError(env, io) else { return .fail }
+        // Learned minimum sizes only grow; balancing re-measures them so a
+        // window gives back space its app no longer needs.
+        for window in target.workspace.allLeafWindowsRecursive {
+            window.forgetMinimumTilingSize()
+        }
         balance(target.workspace.rootTilingContainer)
         return .succ
     }

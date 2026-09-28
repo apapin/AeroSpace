@@ -374,9 +374,12 @@ Accordion subtrees remain "escape islands", and a stack is treated as one BSP le
 `bsp-auto-balance = 'ancestors'` gives each affected subtree space proportional to its BSP-leaf count after an insertion, removal, stack, or directional mouse drop.
 For example, splitting one side of a two-window layout changes the outer ratio from `1:1` to `1:2`, so all three slots receive equal virtual area while ratios inside unrelated subtrees remain untouched.
 `bsp-auto-balance = 'workspace'` reapplies that rule recursively to every tiled subtree; `off` preserves split sizes exactly as before.
-If an application consistently rejects a tile smaller than its native minimum size, AeroSpace confirms the rejected dimension across multiple layout passes, then gives the closest enclosing split enough space for that leaf.
-The confirmation prevents a stale Accessibility API read from becoming a bogus minimum, while adjusting the split prevents a constrained window from silently overlapping its neighbors.
-If the combined native minimum sizes exceed the workspace itself, a non-overlapping tiled layout is physically impossible.
+If an application consistently rejects a tile smaller than its native minimum size, AeroSpace confirms the rejected dimension across several layout passes and remembers it as that window's minimum.
+Every later layout reserves the minimum in the enclosing splits before placing any window, taking the space from the neighbors in proportion to their spare room, so a constrained window does not overlap its neighbors.
+The confirmation prevents a stale Accessibility API read from becoming a bogus minimum, and an application whose reported size never settles stops being probed after a few passes.
+A learned minimum only grows; `balance-sizes` forgets the minimums learned in the workspace so that they are measured again, which gives back space after an application's own minimum shrinks.
+If the combined native minimum sizes exceed the available space, a non-overlapping tiled layout is physically impossible.
+AeroSpace then shares the space in proportion to the minimums and keeps each window inside the workspace, accepting the overlap instead of rearranging the windows forever.
 The former `enable-normalization-bsp-shape` key remains accepted as a deprecated alias so existing fork configs continue to work.
 
 [.lead]
