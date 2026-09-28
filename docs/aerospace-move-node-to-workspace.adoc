@@ -25,6 +25,8 @@ aerospace move-node-to-workspace [-h|--help] [--focus-follows-window] [--fail-if
 
 `(next|prev)` is identical to `workspace (next|prev)`
 
+When `enable-bsp-layout` is on, a tiled window is placed exactly like a newly opened window: it splits the target workspace's most recent window.
+
 // =========================================================== Options
 include::./util/conditional-options-header.adoc[]
 

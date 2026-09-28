@@ -20,6 +20,8 @@ struct MoveCommand: Command {
         }
         switch currentWindow.windowParentCases {
             case .unbound: return .fail
+            case .tilingContainer where config.enableBspLayout:
+                return moveBspSlot(currentWindow, direction: direction, io, args, env)
             case .tilingContainer(let parent):
                 guard let indexOfCurrent = currentWindow.ownIndex else { return .fail(io.err(bugPrompt())) }
                 let indexOfSiblingTarget = indexOfCurrent + direction.focusOffset
@@ -95,6 +97,33 @@ struct MoveCommand: Command {
 }
 
 private let moveOutMacosUnconventionalWindow = "moving macOS fullscreen, minimized windows and windows of hidden apps isn't yet supported. This behavior is subject to change"
+
+/// In BSP mode, a directional move exchanges the window's BSP slot with the
+/// neighboring slot, like `swap`. The upstream move-in and move-out rules turn
+/// the binary tree into an n-ary one, and the BSP repair pass then folds it
+/// back by recency into a shape unrelated to the requested direction. Without
+/// a neighbor in that direction, the upstream boundary behavior applies.
+@MainActor private func moveBspSlot(
+    _ window: Window,
+    direction: CardinalDirection,
+    _ io: CmdIo,
+    _ args: MoveCmdArgs,
+    _ env: CmdEnv,
+) -> BinaryExitCode {
+    if let (parent, ownIndex) = window.closestParent(hasChildrenInDirection: direction, withLayout: nil),
+       let neighbor = parent.children[ownIndex + direction.focusOffset].findLeafWindowRecursive(snappedTo: direction.opposite)
+    {
+        swapBspSlots(mruDominant: window, neighbor)
+        return .succ
+    }
+    let sourceParent = window.parent as? TilingContainer
+    let sourceIndex = window.ownIndex
+    let result = moveOut(tilingWindow: window, direction: direction, io, args, env)
+    if window.parent !== sourceParent || window.ownIndex != sourceIndex {
+        rebalanceBspAfterTopologyChange(around: [sourceParent, window].compactMap { $0 })
+    }
+    return result
+}
 
 @MainActor private func moveOut(
     tilingWindow window: Window,

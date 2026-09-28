@@ -37,9 +37,17 @@ func moveWindowToWorkspace(_ window: Window, _ targetWorkspace: Workspace, _ io:
                 .succ(io.err("Window '\(window.windowId)' already belongs to workspace '\(targetWorkspace.name)'. Tip: use --fail-if-noop to exit with non-zero code"))
         }
     }
-    let targetContainer: NonLeafTreeNodeObject = window.isFloating
-        ? targetWorkspace.floatingWindowsContainer
-        : targetWorkspace.rootTilingContainer
-    window.bind(to: targetContainer, adaptiveWeight: WEIGHT_AUTO, index: index)
+    if config.enableBspLayout && !window.isFloating {
+        // Split the target's most recent window like a newly opened window,
+        // instead of appending to the root and relying on the BSP repair pass.
+        let sourceParent = window.parent as? TilingContainer
+        window.bindAsNewTilingWindow(on: targetWorkspace)
+        rebalanceBspAfterTopologyChange(around: [sourceParent, window].compactMap { $0 })
+    } else {
+        let targetContainer: NonLeafTreeNodeObject = window.isFloating
+            ? targetWorkspace.floatingWindowsContainer
+            : targetWorkspace.rootTilingContainer
+        window.bind(to: targetContainer, adaptiveWeight: WEIGHT_AUTO, index: index)
+    }
     return .from(bool: focusFollowsWindow ? window.focusWindow() : true)
 }

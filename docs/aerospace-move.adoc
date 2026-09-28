@@ -21,6 +21,9 @@ aerospace move [-h|--help] [--window-id <window-id>] [--boundaries <boundary>]
 // tag::body[]
 Move the focused window in the given direction. See the "Examples" section for more details.
 
+When `enable-bsp-layout` is on, a tiled window exchanges its BSP leaf with the neighboring leaf in the given direction, like `swap`, and the tree keeps its shape.
+The `--boundaries` and `--boundaries-action` behavior applies only when no leaf lies in that direction.
+
 Deprecated name: `move-through`
 
 // =========================================================== Options

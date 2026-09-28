@@ -214,6 +214,18 @@ extension Window {
         let placement = forceTile
             ? placementForNewTilingWindow(workspace, window: self)
             : try await unbindAndGetPlacementForNewWindow(self.asMacWindow().windowId, self.asMacWindow().macApp, workspace, window: self, cm)
+        bind(placement)
+    }
+
+    /// Place the window in `workspace` exactly as a newly opened tiling window
+    /// would be placed: in BSP mode it splits the workspace's most recent window.
+    @MainActor
+    func bindAsNewTilingWindow(on workspace: Workspace) {
+        bind(placementForNewTilingWindow(workspace, window: self))
+    }
+
+    @MainActor
+    private func bind(_ placement: NewWindowPlacement) {
         let data = placement.binding
         bind(to: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
         if let bspTarget = placement.bspTarget {
