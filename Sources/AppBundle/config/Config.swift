@@ -63,6 +63,8 @@ struct Config: ConvenienceMutable {
 
     var gaps: Gaps = .zero
     var workspaceToMonitorForceAssignment: [String: [MonitorDescription]] = [:]
+    /// Monitors AeroSpace never uses, matched by case-insensitive name regex.
+    var ignoredMonitors: [CaseInsensitiveRegex] = []
     var modes: [String: Mode] = [:]
     var onWindowDetected: [WindowDetectedCallback] = []
     var onModeChanged: Shell<any Command> = .empty

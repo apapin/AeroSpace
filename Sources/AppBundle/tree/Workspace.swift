@@ -109,7 +109,7 @@ extension Workspace {
         forceAssignedMonitor
             ?? visibleWorkspaceToScreenPoint[self]?.monitorApproximation
             ?? assignedMonitorPoint?.monitorApproximation
-            ?? mainMonitor
+            ?? managedMainMonitor
     }
 }
 

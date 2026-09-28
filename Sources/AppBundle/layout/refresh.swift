@@ -161,7 +161,13 @@ private func layoutWorkspaces() async throws {
         }
         return
     }
+    // Only ignored displays are connected (for example, only a dashboard panel
+    // stays on while the main displays sleep). Leave every window where it is
+    // instead of tiling windows onto a display AeroSpace must not use.
+    if isLayoutSuspendedOnIgnoredMonitors { return }
     let monitors = monitors
+    // Hiding corners must avoid every physical display, ignored ones included.
+    let physicalMonitors = allMonitors
     var monitorToOptimalHideCorner: [CGPoint: OptimalHideCorner] = [:]
     for monitor in monitors {
         let xOff = monitor.width * 0.1
@@ -180,8 +186,8 @@ private func layoutWorkspaces() async throws {
         let important = 10
 
         let corner: OptimalHideCorner =
-            monitors.sumOfInt { contains($0, blc1) + contains($0, blc2) + important * contains($0, blc3) } <
-            monitors.sumOfInt { contains($0, brc1) + contains($0, brc2) + important * contains($0, brc3) }
+            physicalMonitors.sumOfInt { contains($0, blc1) + contains($0, blc2) + important * contains($0, blc3) } <
+            physicalMonitors.sumOfInt { contains($0, brc1) + contains($0, brc2) + important * contains($0, brc3) }
             ? .bottomLeftCorner
             : .bottomRightCorner
         monitorToOptimalHideCorner[monitor.rect.topLeftCorner] = corner

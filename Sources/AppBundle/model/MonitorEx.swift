@@ -11,6 +11,7 @@ extension Monitor {
         )
     }
 
+    @MainActor
     var monitorId_oneBased: Int? {
         let sorted = sortedMonitors
         let origin = self.rect.topLeftCorner

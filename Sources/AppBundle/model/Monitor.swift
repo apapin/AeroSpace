@@ -104,12 +104,58 @@ var mainMonitor: Monitor {
     return LazyMonitor(monitorAppKitNsScreenScreensId: screen.index + 1, isMain: true, screen.value)
 }
 
-var monitors: [Monitor] {
+/// Every connected display, including the ones matched by `ignored-monitors`.
+/// Use it only for physical geometry; everything else uses `monitors`.
+var allMonitors: [Monitor] {
     isUnitTest
         ? [testMonitor]
         : NSScreen.screens.enumerated().map { $0.element.toMonitor(monitorAppKitNsScreenScreensId: $0.offset + 1) }
 }
 
+/// The displays AeroSpace manages: every connected display except the ignored
+/// ones. AeroSpace's model needs at least one monitor, so when only ignored
+/// displays are connected it keeps them and suspends layout instead (see
+/// `isLayoutSuspendedOnIgnoredMonitors`).
+@MainActor
+var monitors: [Monitor] {
+    managedMonitors(allMonitors, ignoring: config.ignoredMonitors)
+}
+
+@MainActor
+func managedMonitors(_ all: [Monitor], ignoring patterns: [CaseInsensitiveRegex]) -> [Monitor] {
+    guard !patterns.isEmpty else { return all }
+    let managed = all.filter { !$0.isIgnored(by: patterns) }
+    return managed.isEmpty ? all : managed
+}
+
+/// True when every connected display is ignored, for example when only a
+/// dashboard panel stays on. AeroSpace then leaves all windows where they are.
+@MainActor
+var isLayoutSuspendedOnIgnoredMonitors: Bool {
+    let patterns = config.ignoredMonitors
+    return !patterns.isEmpty && allMonitors.allSatisfy { $0.isIgnored(by: patterns) }
+}
+
+/// `mainMonitor` for workspace assignment and focus. `mainMonitor` is the
+/// display at the origin of the global coordinate space, which macOS may
+/// hand to an ignored display when the real main display disconnects.
+@MainActor
+var managedMainMonitor: Monitor {
+    resolveManagedMainMonitor(main: mainMonitor, managed: monitors)
+}
+
+func resolveManagedMainMonitor(main: Monitor, managed: [Monitor]) -> Monitor {
+    managed.first { $0.rect.topLeftCorner == main.rect.topLeftCorner } ?? managed.first ?? main
+}
+
+extension Monitor {
+    @MainActor
+    func isIgnored(by patterns: [CaseInsensitiveRegex]) -> Bool {
+        patterns.contains { name.contains(caseInsensitiveRegex: $0) }
+    }
+}
+
+@MainActor
 var sortedMonitors: [Monitor] {
     monitors.sortedBy([\.rect.minX, \.rect.minY])
 }

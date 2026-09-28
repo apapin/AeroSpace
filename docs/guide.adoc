@@ -821,6 +821,25 @@ The first matching pattern will be used
 
 xref:commands.adoc#move-workspace-to-monitor[move-workspace-to-monitor] command has no effect for workspaces that have monitor assignment
 
+[#ignored-monitors]
+=== Ignore monitors
+
+Use `ignored-monitors` for a display that AeroSpace must never use, such as a touch panel that shows its own dashboard.
+
+[source,toml]
+----
+ignored-monitors = ['xeneon']  # Case insensitive regex substrings of monitor names
+----
+
+An ignored monitor never gets a workspace, and AeroSpace never lays windows out on it.
+It is left out of `list-monitors`, monitor sequence numbers, `main`, `secondary`, and the monitor commands, so with two other displays connected, `secondary` still resolves.
+If macOS makes an ignored display the main display, for example because the usual main display disconnected, `main` means the managed monitor at the same origin, or else the first managed monitor.
+At startup, a window found on an ignored display joins the visible workspace of the nearest managed monitor; layout moves floating windows off ignored displays as well.
+Hidden windows still avoid every connected display, ignored ones included, when AeroSpace picks a hiding corner.
+When only ignored displays are connected, AeroSpace keeps them as the monitors of its model but leaves every window where it is until a managed display returns.
+
+Only name patterns are supported: `main`, `secondary`, and monitor sequence numbers are rejected.
+
 == Dialog heuristics
 
 * Apple provides accessibility API for apps to let others know which of their windows are dialogs

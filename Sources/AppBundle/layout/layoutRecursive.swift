@@ -79,10 +79,15 @@ extension Window {
         let workspace = context.workspace
         let windowRect = try await getAxRect(.cancellable) // Probably not idempotent
         let currentMonitor = windowRect?.center.monitorApproximation
-        if let currentMonitor, let windowRect, workspace != currentMonitor.activeWorkspace {
+        // A floating window on an ignored display, for example a dialog that
+        // opened there while it was the main display, belongs on its
+        // workspace's monitor like a window left on another monitor.
+        let ignoredMonitor = windowRect?.center.physicalMonitor?.takeIf { $0.isIgnored(by: config.ignoredMonitors) }
+        if let currentMonitor, let windowRect, ignoredMonitor != nil || workspace != currentMonitor.activeWorkspace {
+            let sourceMonitor = ignoredMonitor ?? currentMonitor
             let windowTopLeftCorner = windowRect.topLeftCorner
-            let xProportion = (windowTopLeftCorner.x - currentMonitor.visibleRect.topLeftX) / currentMonitor.visibleRect.width
-            let yProportion = (windowTopLeftCorner.y - currentMonitor.visibleRect.topLeftY) / currentMonitor.visibleRect.height
+            let xProportion = (windowTopLeftCorner.x - sourceMonitor.visibleRect.topLeftX) / sourceMonitor.visibleRect.width
+            let yProportion = (windowTopLeftCorner.y - sourceMonitor.visibleRect.topLeftY) / sourceMonitor.visibleRect.height
 
             let workspaceRect = workspace.workspaceMonitor.visibleRect
             var newX = workspaceRect.topLeftX + xProportion * workspaceRect.width

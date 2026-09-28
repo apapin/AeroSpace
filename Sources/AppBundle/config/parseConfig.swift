@@ -164,6 +164,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "gaps": Parser(\.gaps, parseGaps),
     "focus-follows-mouse": Parser(\.focusFollowsMouse, parseFocusFollowsMouse),
     "workspace-to-monitor-force-assignment": Parser(\.workspaceToMonitorForceAssignment, parseWorkspaceToMonitorAssignment),
+    "ignored-monitors": Parser(\.ignoredMonitors, parseIgnoredMonitors),
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),
 
     // Deprecated
@@ -479,6 +480,23 @@ private func parseMouseDropAction(_ raw: OrderedJson, _ backtrace: ConfigBacktra
 
 private func parseBspAutoBalance(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<BspAutoBalance> {
     parseString(raw, backtrace).flatMap { parseEnum($0, BspAutoBalance.self).toParsedConfig(backtrace) }
+}
+
+/// Monitor name patterns only: 'main', 'secondary' and sequence numbers are
+/// resolved against the managed monitors, so they cannot select what to ignore.
+private func parseIgnoredMonitors(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<[CaseInsensitiveRegex]> {
+    parseTomlArray(raw, backtrace)
+        .flatMap { arr in
+            arr.enumerated().mapAllOrFailure { (index, elem) in
+                let elemBacktrace = backtrace + .index(index)
+                return parseString(elem, elemBacktrace).flatMap { pattern in
+                    if pattern.isEmpty || pattern == "main" || pattern == "secondary" || Int(pattern) != nil {
+                        return .failure(.init(elemBacktrace, "Expected a monitor name pattern, got '\(pattern)'. 'main', 'secondary' and monitor numbers are not supported here"))
+                    }
+                    return CaseInsensitiveRegex.new(pattern).toParsedConfig(elemBacktrace)
+                }
+            }
+        }
 }
 
 extension ResOrStr where Failure == String {
